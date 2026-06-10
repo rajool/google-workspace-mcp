@@ -1,0 +1,11 @@
+# Normalize line endings to LF on checkin; let git auto-detect text vs binary.
+* text=auto eol=lf
+
+# Explicit text types (defensive — these are always LF text).
+*.py   text eol=lf
+*.md   text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.lock text eol=lf

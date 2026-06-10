@@ -1,0 +1,62 @@
+name: Bug report
+description: Report a problem with the server, a tool, or the setup flow
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Please keep this report **generic** — no tokens, OAuth client JSON, real email addresses, or account slugs (this is a public repo).
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: From `.claude-plugin/plugin.json` or the `/plugin` manager.
+      placeholder: "0.4.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Gmail tools
+        - Calendar tools
+        - Drive tools
+        - Tasks tools
+        - authorize flow / tokens
+        - account registry / GWM_ACCOUNTS scoping
+        - /google-workspace-setup command
+        - install / packaging
+        - other / not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead? Include the error message if there is one (redact email addresses and ids).
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Claude Code version, Python/uv version.
+      placeholder: "macOS 15.5, Claude Code 2.x, uv 0.10.x"
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues for a duplicate.
+          required: true
+        - label: This report contains no secrets, tokens, or private content.
+          required: true

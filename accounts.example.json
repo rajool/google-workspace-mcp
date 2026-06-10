@@ -1,0 +1,13 @@
+{
+  "_comment": "Copy to ~/.config/google-workspace-mcp/accounts.json and edit. Each key is a short slug you pick; `name` is the From: display name on sent mail (use \"\" for none). After adding an account, run: google-workspace-authorize <slug>",
+  "accounts": {
+    "work": {
+      "email": "you@company.com",
+      "name": "Your Name"
+    },
+    "personal": {
+      "email": "you@gmail.com",
+      "name": "Your Name"
+    }
+  }
+}

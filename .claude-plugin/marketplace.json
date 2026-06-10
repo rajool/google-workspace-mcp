@@ -1,0 +1,30 @@
+{
+  "$schema": "https://www.schemastore.org/claude-code-marketplace.json",
+  "name": "google-workspace-mcp",
+  "version": "0.4.0",
+  "description": "google-workspace-mcp — a multi-account Gmail + Calendar + Drive + Tasks MCP server for Claude Code, packaged as an installable plugin (also its own marketplace).",
+  "owner": {
+    "name": "Ali Rajool",
+    "url": "https://github.com/rajool"
+  },
+  "plugins": [
+    {
+      "name": "google-workspace-mcp",
+      "source": "./",
+      "category": "productivity",
+      "version": "0.4.0",
+      "description": "Drive Gmail, Google Calendar, Google Drive, and Google Tasks across any number of Google accounts in parallel from one MCP server. Every tool takes an `account` slug, so a single Claude session can email from one account, file in another's Drive, and book a calendar event in a third. Works around the default single-account connector (which also can't delete drafts). Available in every project once installed.",
+      "keywords": [
+        "gmail",
+        "google-calendar",
+        "google-drive",
+        "google-tasks",
+        "google-workspace",
+        "mcp",
+        "multi-account",
+        "oauth",
+        "email"
+      ]
+    }
+  ]
+}

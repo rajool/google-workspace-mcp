@@ -1,0 +1,26 @@
+{
+  "$schema": "https://www.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "google-workspace-mcp",
+  "displayName": "Google Workspace (multi-account)",
+  "version": "0.4.0",
+  "description": "Multi-account Gmail + Google Calendar + Google Drive + Google Tasks MCP server. Every tool takes an `account` slug (e.g. `work` | `personal`), so one Claude session can act across several Google accounts in parallel — send/draft/delete email, manage calendars, move/upload/share Drive files, and manage tasks. Accounts are configured at runtime (bring your own OAuth client); a per-project .mcp.json scopes each project to specific accounts. A self-built replacement for the single-account default connector.",
+  "author": {
+    "name": "Ali Rajool",
+    "url": "https://github.com/rajool"
+  },
+  "homepage": "https://github.com/rajool/google-workspace-mcp",
+  "repository": "https://github.com/rajool/google-workspace-mcp",
+  "license": "MIT",
+  "keywords": [
+    "gmail",
+    "google-calendar",
+    "google-drive",
+    "google-tasks",
+    "google-workspace",
+    "mcp",
+    "multi-account",
+    "oauth",
+    "email",
+    "claude-code"
+  ]
+}

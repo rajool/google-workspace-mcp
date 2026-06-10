@@ -1,0 +1,22 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Secrets — never commit
+credentials.json
+tokens/
+*.json.tmp
+.env
+
+# Machine-local Claude Code settings
+.claude/settings.local.json
+
+# OS
+.DS_Store

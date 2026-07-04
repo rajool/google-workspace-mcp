@@ -16,6 +16,7 @@ from email.utils import formataddr
 from pathlib import Path
 from typing import Any, Literal
 
+from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 
 from mcp.server.fastmcp import FastMCP
@@ -367,6 +368,34 @@ def gmail_labels_list(account: AccountSlug) -> dict:
 
 
 @mcp.tool()
+def gmail_label_create(
+    account: AccountSlug,
+    name: str,
+    label_list_visibility: Literal[
+        "labelShow", "labelShowIfUnread", "labelHide"
+    ] = "labelShow",
+    message_list_visibility: Literal["show", "hide"] = "show",
+) -> dict:
+    """Create a label. Nested labels use 'Parent/Child' names; create each
+    parent level first. Idempotent: an existing label is returned as-is."""
+    svc = auth.gmail(account).users().labels()
+    body = {
+        "name": name,
+        "labelListVisibility": label_list_visibility,
+        "messageListVisibility": message_list_visibility,
+    }
+    try:
+        label = svc.create(userId="me", body=body).execute()
+    except HttpError as e:
+        if e.resp.status != 409:
+            raise
+        existing = svc.list(userId="me").execute().get("labels", [])
+        label = next(lb for lb in existing if lb.get("name") == name)
+        return {**label, "already_existed": True}
+    return label
+
+
+@mcp.tool()
 def gmail_thread_get(account: AccountSlug, thread_id: str) -> dict:
     """Fetch a whole thread (all messages)."""
     t = (
@@ -380,6 +409,30 @@ def gmail_thread_get(account: AccountSlug, thread_id: str) -> dict:
         "id": t.get("id"),
         "messages": [_msg_summary(m) for m in t.get("messages", [])],
     }
+
+
+@mcp.tool()
+def gmail_attachment_download(
+    account: AccountSlug,
+    message_id: str,
+    attachment_id: str,
+    save_to: str,
+) -> dict:
+    """Download one attachment to a local path. Get `attachment_id` from
+    the message payload parts (gmail_message_get with format=full)."""
+    att = (
+        auth.gmail(account)
+        .users()
+        .messages()
+        .attachments()
+        .get(userId="me", messageId=message_id, id=attachment_id)
+        .execute()
+    )
+    data = base64.urlsafe_b64decode(att["data"])
+    path = Path(save_to).expanduser()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    return {"saved_to": str(path), "size_bytes": len(data)}
 
 
 # ─── Calendar ───────────────────────────────────────────────────────────

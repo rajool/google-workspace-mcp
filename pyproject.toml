@@ -1,6 +1,6 @@
 [project]
 name = "google-workspace-mcp"
-version = "0.4.0"
+version = "0.5.0"
 description = "Multi-account Google Workspace MCP server (Gmail + Calendar + Drive + Tasks) for Claude Code"
 requires-python = ">=3.12"
 dependencies = [

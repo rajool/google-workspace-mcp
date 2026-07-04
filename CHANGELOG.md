@@ -10,6 +10,19 @@ only when it is bumped.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-04
+
+Two additions to the Gmail tool surface, driven by the first real
+email-triage run in the personal-assistant workspace (both gaps blocked it).
+
+### Added
+
+- `gmail_label_create` — create a label (nested via `Parent/Child` names,
+  parents first). Idempotent: on a 409 the existing label is returned with
+  `already_existed: true`.
+- `gmail_attachment_download` — download one attachment to a local path,
+  given the `attachment_id` from a `format=full` message payload.
+
 ## [0.4.0] - 2026-06-09
 
 A professional overhaul of the repository. No change to the tool surface or to

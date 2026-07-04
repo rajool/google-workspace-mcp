@@ -183,6 +183,8 @@ Every call requires an `account` slug. `accounts_list` shows the configured acco
 | `gmail_message_modify` | Add/remove labels (e.g. mark read by removing `UNREAD`). |
 | `gmail_message_trash` | Move to Trash (reversible for 30 days). |
 | `gmail_labels_list` | List all labels. |
+| `gmail_label_create` | Create a label (nested via `Parent/Child` names). Idempotent — an existing label is returned as-is. |
+| `gmail_attachment_download` | Download one attachment to a local path (`attachment_id` from a `format=full` message). |
 
 ### Calendar
 

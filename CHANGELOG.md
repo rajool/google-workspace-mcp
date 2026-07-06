@@ -10,6 +10,18 @@ only when it is bumped.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-06
+
+### Added
+
+- `drive_file_link_access` — toggle "anyone with the link" access on a file the
+  account owns (create/delete the `anyone` permission). Built for
+  zero-bandwidth flows where an external API fetches a Drive file server-side
+  (e.g. ElevenLabs `source_url` transcription): enable, hand off the returned
+  `direct_download_url`, revoke immediately after. Driven by the Hengam
+  meeting-processor's Meet recordings — 0.7–1.8GB per meeting that no longer
+  needs a local download.
+
 ## [0.5.0] - 2026-07-04
 
 Two additions to the Gmail tool surface, driven by the first real
@@ -90,5 +102,7 @@ how the server is configured.
   scoping, and the `google-workspace-authorize` OAuth CLI.
 - The `/google-workspace-setup` guided-setup command.
 
-[Unreleased]: https://github.com/rajool/google-workspace-mcp/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/rajool/google-workspace-mcp/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/rajool/google-workspace-mcp/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/rajool/google-workspace-mcp/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/rajool/google-workspace-mcp/releases/tag/v0.4.0

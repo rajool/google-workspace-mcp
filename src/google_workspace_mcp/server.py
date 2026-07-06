@@ -849,6 +849,45 @@ def drive_file_share(
     return auth.drive(account).permissions().create(**kwargs).execute()
 
 
+@mcp.tool()
+def drive_file_link_access(
+    account: AccountSlug,
+    file_id: str,
+    enabled: bool,
+    role: Literal["reader", "commenter"] = "reader",
+) -> dict:
+    """Toggle "anyone with the link" access on a file the account owns.
+
+    Built for zero-bandwidth server-side fetches: some APIs (e.g. a
+    transcription service's source_url parameter) can download a Drive file
+    themselves — but only while it is link-accessible. Flow: enable, hand the
+    returned direct_download_url to the fetching service, then IMMEDIATELY
+    call again with enabled=false to revoke. Never leave link access on.
+    """
+    service = auth.drive(account)
+    if enabled:
+        service.permissions().create(
+            fileId=file_id,
+            body={"type": "anyone", "role": role},
+            supportsAllDrives=True,
+        ).execute()
+        return {
+            "file_id": file_id,
+            "link_access": role,
+            "direct_download_url": (
+                "https://drive.usercontent.google.com/download"
+                f"?id={file_id}&export=download&confirm=t"
+            ),
+            "reminder": "Revoke when done: call again with enabled=false.",
+        }
+    service.permissions().delete(
+        fileId=file_id,
+        permissionId="anyoneWithLink",
+        supportsAllDrives=True,
+    ).execute()
+    return {"file_id": file_id, "link_access": "off"}
+
+
 # ─── Tasks (Google Tasks) ────────────────────────────────────────────────
 
 

@@ -10,6 +10,17 @@ only when it is bumped.
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-08-22
+
+### Added
+
+- The generated text/html alternative now renders plain-text lists the way
+  Gmail's composer draws them: runs of `- ` / `* ` / `• ` lines become a real
+  `<ul>`, runs of `1. ` / `1) ` lines (ASCII, Persian, or Arabic-Indic digits)
+  a real `<ol>` (with `start` when the run does not begin at 1), each with
+  `dir="auto"` so RTL lists get right-side markers. The text/plain part is
+  untouched — still byte-identical to the caller's body.
+
 ## [0.6.1] - 2026-08-22
 
 ### Fixed

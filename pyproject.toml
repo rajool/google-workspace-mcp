@@ -1,6 +1,6 @@
 [project]
 name = "google-workspace-mcp"
-version = "0.6.0"
+version = "0.6.1"
 description = "Multi-account Google Workspace MCP server (Gmail + Calendar + Drive + Tasks) for Claude Code"
 requires-python = ">=3.12"
 dependencies = [
@@ -8,7 +8,7 @@ dependencies = [
     "google-auth>=2.53.0",
     "google-auth-httplib2>=0.4.0",
     "google-auth-oauthlib>=1.4.0",
-    "mcp>=1.27.2",
+    "mcp>=1.27.2,<2",
 ]
 
 [project.scripts]

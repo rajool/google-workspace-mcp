@@ -13,6 +13,7 @@ import io
 import mimetypes
 from email.message import EmailMessage
 from email.utils import formataddr
+from html import escape
 from pathlib import Path
 from typing import Any, Literal
 
@@ -58,7 +59,26 @@ def _build_mime(
         msg.set_content(body, subtype="html")
     else:
         msg.set_content(body)
+        msg.add_alternative(_plain_to_html(body), subtype="html")
     return base64.urlsafe_b64encode(msg.as_bytes()).decode()
+
+
+def _plain_to_html(body: str) -> str:
+    """Render a plain-text body the way Gmail's own composer does: one <div>
+    per line, blank lines as <div><br></div>, dir="auto" so LTR and RTL lines
+    each lay out correctly.
+
+    Attached as the text/html alternative of every plain-text message so a
+    draft opened in the Gmail web UI keeps its rich-text shape. Without it
+    Gmail treats the draft as plain-text-only and, on Send, rewrites the body
+    with hard line breaks at ~70 columns — visibly broken paragraphs for the
+    recipient. Gmail-composed mail never shows this because it is always
+    multipart/alternative and clients display the HTML part.
+    """
+    return "".join(
+        f'<div dir="auto">{escape(line)}</div>' if line.strip() else '<div dir="auto"><br></div>'
+        for line in body.split("\n")
+    )
 
 
 def _from_header(slug: str) -> str:

@@ -10,6 +10,21 @@ only when it is bumped.
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-08-22
+
+### Fixed
+
+- Plain-text messages (`gmail_send` / `gmail_draft_create` / `gmail_draft_update`
+  without `html=true`) are now built as `multipart/alternative` with a generated
+  `text/html` part mirroring Gmail's own composer output (one `<div dir="auto">`
+  per line). A plain-text-only draft opened in the Gmail web UI was treated as
+  plain-text mode, and on Send Gmail rewrote the body with hard line breaks at
+  ~70 columns — recipients saw broken mid-sentence paragraphs (hit on a real
+  W Brothers email, 2026-08-22). Gmail-composed mail never shows this because
+  it is always multipart; drafts now match that shape, so sending from the web
+  UI is safe. The `text/plain` part remains the caller's body, byte-identical;
+  `html=true` behavior is unchanged.
+
 ## [0.6.0] - 2026-07-06
 
 ### Added

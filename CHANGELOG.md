@@ -10,6 +10,17 @@ only when it is bumped.
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-08-22
+
+### Changed
+
+- `gmail_send` / `gmail_draft_create` / `gmail_draft_update` tool descriptions
+  now teach the body format at the point of use — plain text with `- ` bullets
+  and `1.` / `1)` numbered lines (ASCII or Persian digits), no manual
+  hard-wrapping, `html=true` only for real HTML — so every project and
+  assistant using this server gets the guidance automatically, with no
+  per-project documentation needed. README gained the same section.
+
 ## [0.6.2] - 2026-08-22
 
 ### Added

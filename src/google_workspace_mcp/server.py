@@ -189,6 +189,13 @@ def gmail_send(
     For replies, pass thread_id AND in_reply_to_message_id (the RFC822
     Message-Id header value, NOT the Gmail message id) so the reply
     threads correctly.
+
+    Body format: write `body` as plain text — blank-line paragraphs,
+    "- " bullets, "1." / "1)" numbered lines (ASCII or Persian digits).
+    It goes out as multipart/alternative with a Gmail-composer-style HTML
+    part, so lists arrive as Gmail's real bullets/numbering and the draft
+    can be opened and sent from the Gmail web UI safely. Never hard-wrap
+    lines yourself. Set html=true only for a body that is already HTML.
     """
     raw = _build_mime(
         sender=_from_header(account),
@@ -224,7 +231,15 @@ def gmail_draft_create(
     html: bool = False,
     thread_id: str | None = None,
 ) -> dict:
-    """Create a Gmail draft. Returns {id, message: {...}}."""
+    """Create a Gmail draft. Returns {id, message: {...}}.
+
+    Body format: write `body` as plain text — blank-line paragraphs,
+    "- " bullets, "1." / "1)" numbered lines (ASCII or Persian digits).
+    It goes out as multipart/alternative with a Gmail-composer-style HTML
+    part, so lists arrive as Gmail's real bullets/numbering and the draft
+    can be opened and sent from the Gmail web UI safely. Never hard-wrap
+    lines yourself. Set html=true only for a body that is already HTML.
+    """
     raw = _build_mime(
         sender=_from_header(account),
         to=to,
@@ -258,7 +273,15 @@ def gmail_draft_update(
     bcc: list[str] | None = None,
     html: bool = False,
 ) -> dict:
-    """Overwrite an existing draft's contents."""
+    """Overwrite an existing draft's contents.
+
+    Body format: write `body` as plain text — blank-line paragraphs,
+    "- " bullets, "1." / "1)" numbered lines (ASCII or Persian digits).
+    It goes out as multipart/alternative with a Gmail-composer-style HTML
+    part, so lists arrive as Gmail's real bullets/numbering and the draft
+    can be opened and sent from the Gmail web UI safely. Never hard-wrap
+    lines yourself. Set html=true only for a body that is already HTML.
+    """
     raw = _build_mime(
         sender=_from_header(account),
         to=to,

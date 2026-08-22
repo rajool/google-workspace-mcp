@@ -24,6 +24,9 @@ only when it is bumped.
   it is always multipart; drafts now match that shape, so sending from the web
   UI is safe. The `text/plain` part remains the caller's body, byte-identical;
   `html=true` behavior is unchanged.
+- CI: cap the `mcp` dependency below 2.0 — `mcp 2.0.0` moved
+  `mcp.server.fastmcp`, breaking the import smoke test on a bare
+  `pip install .`.
 
 ## [0.6.0] - 2026-07-06
 

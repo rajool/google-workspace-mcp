@@ -183,6 +183,8 @@ Every call requires an `account` slug. `accounts_list` shows the configured acco
 | `gmail_message_modify` | Add/remove labels (e.g. mark read by removing `UNREAD`). |
 | `gmail_message_trash` | Move to Trash (reversible for 30 days). |
 | `gmail_labels_list` | List all labels. |
+
+**Email body format.** Write `body` as plain text: blank-line paragraphs, `- ` bullets, `1.` / `1)` numbered lines (ASCII or Persian digits). The server sends it as `multipart/alternative` — the `text/plain` part byte-identical to your body, plus a generated Gmail-composer-style `text/html` part (`<div dir="auto">` per line, real `<ul>`/`<ol>` for lists). Recipients see proper paragraphs and Gmail-native bullets/numbering, RTL and LTR lines both lay out correctly, and a draft opened in the Gmail web UI can be edited and sent safely (Gmail hard-wraps plain-text-only messages at ~70 columns on Send; multipart is immune). Never hard-wrap lines yourself; pass `html=true` only when the body is already real HTML.
 | `gmail_label_create` | Create a label (nested via `Parent/Child` names). Idempotent — an existing label is returned as-is. |
 | `gmail_attachment_download` | Download one attachment to a local path (`attachment_id` from a `format=full` message). |
 

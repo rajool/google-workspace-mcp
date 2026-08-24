@@ -11,8 +11,10 @@ from __future__ import annotations
 import base64
 import io
 import mimetypes
+import re
 from email.message import EmailMessage
 from email.utils import formataddr
+from html import escape
 from pathlib import Path
 from typing import Any, Literal
 
@@ -58,7 +60,58 @@ def _build_mime(
         msg.set_content(body, subtype="html")
     else:
         msg.set_content(body)
+        msg.add_alternative(_plain_to_html(body), subtype="html")
     return base64.urlsafe_b64encode(msg.as_bytes()).decode()
+
+
+_BULLET_RE = re.compile(r"^[-*\u2022]\s+(.*)$")
+_NUMBERED_RE = re.compile(r"^([0-9\u06f0-\u06f9\u0660-\u0669]{1,3})[.)]\s+(.*)$")
+_DIGITS = str.maketrans("\u06f0\u06f1\u06f2\u06f3\u06f4\u06f5\u06f6\u06f7\u06f8\u06f9"
+                        "\u0660\u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668\u0669",
+                        "01234567890123456789")
+
+
+def _plain_to_html(body: str) -> str:
+    """Render a plain-text body the way Gmail's own composer does.
+
+    Regular lines become one <div> per line (blank lines <div><br></div>);
+    runs of "- " / "* " / "\u2022 " lines become a real <ul>, and runs of
+    "1. " / "1) " lines (ASCII, Persian, or Arabic-Indic digits) a real <ol>
+    with the list marker Gmail itself would draw. dir="auto" throughout so
+    LTR and RTL lines each lay out correctly, markers included.
+
+    Attached as the text/html alternative of every plain-text message so a
+    draft opened in the Gmail web UI keeps its rich-text shape. Without it
+    Gmail treats the draft as plain-text-only and, on Send, rewrites the body
+    with hard line breaks at ~70 columns — visibly broken paragraphs for the
+    recipient. Gmail-composed mail never shows this because it is always
+    multipart/alternative and clients display the HTML part.
+    """
+    out: list[str] = []
+    lines = body.split("\n")
+    i = 0
+    while i < len(lines):
+        if _BULLET_RE.match(lines[i]):
+            items = []
+            while i < len(lines) and (m := _BULLET_RE.match(lines[i])):
+                items.append(f'<li dir="auto">{escape(m.group(1))}</li>')
+                i += 1
+            out.append(f'<ul dir="auto">{"".join(items)}</ul>')
+        elif m := _NUMBERED_RE.match(lines[i]):
+            start = int(m.group(1).translate(_DIGITS))
+            items = []
+            while i < len(lines) and (m := _NUMBERED_RE.match(lines[i])):
+                items.append(f'<li dir="auto">{escape(m.group(2))}</li>')
+                i += 1
+            attr = f' start="{start}"' if start != 1 else ""
+            out.append(f'<ol dir="auto"{attr}>{"".join(items)}</ol>')
+        else:
+            line = lines[i]
+            out.append(
+                f'<div dir="auto">{escape(line)}</div>' if line.strip() else '<div dir="auto"><br></div>'
+            )
+            i += 1
+    return "".join(out)
 
 
 def _from_header(slug: str) -> str:
@@ -136,6 +189,13 @@ def gmail_send(
     For replies, pass thread_id AND in_reply_to_message_id (the RFC822
     Message-Id header value, NOT the Gmail message id) so the reply
     threads correctly.
+
+    Body format: write `body` as plain text — blank-line paragraphs,
+    "- " bullets, "1." / "1)" numbered lines (ASCII or Persian digits).
+    It goes out as multipart/alternative with a Gmail-composer-style HTML
+    part, so lists arrive as Gmail's real bullets/numbering and the draft
+    can be opened and sent from the Gmail web UI safely. Never hard-wrap
+    lines yourself. Set html=true only for a body that is already HTML.
     """
     raw = _build_mime(
         sender=_from_header(account),
@@ -171,7 +231,15 @@ def gmail_draft_create(
     html: bool = False,
     thread_id: str | None = None,
 ) -> dict:
-    """Create a Gmail draft. Returns {id, message: {...}}."""
+    """Create a Gmail draft. Returns {id, message: {...}}.
+
+    Body format: write `body` as plain text — blank-line paragraphs,
+    "- " bullets, "1." / "1)" numbered lines (ASCII or Persian digits).
+    It goes out as multipart/alternative with a Gmail-composer-style HTML
+    part, so lists arrive as Gmail's real bullets/numbering and the draft
+    can be opened and sent from the Gmail web UI safely. Never hard-wrap
+    lines yourself. Set html=true only for a body that is already HTML.
+    """
     raw = _build_mime(
         sender=_from_header(account),
         to=to,
@@ -205,7 +273,15 @@ def gmail_draft_update(
     bcc: list[str] | None = None,
     html: bool = False,
 ) -> dict:
-    """Overwrite an existing draft's contents."""
+    """Overwrite an existing draft's contents.
+
+    Body format: write `body` as plain text — blank-line paragraphs,
+    "- " bullets, "1." / "1)" numbered lines (ASCII or Persian digits).
+    It goes out as multipart/alternative with a Gmail-composer-style HTML
+    part, so lists arrive as Gmail's real bullets/numbering and the draft
+    can be opened and sent from the Gmail web UI safely. Never hard-wrap
+    lines yourself. Set html=true only for a body that is already HTML.
+    """
     raw = _build_mime(
         sender=_from_header(account),
         to=to,

@@ -10,6 +10,46 @@ only when it is bumped.
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-08-22
+
+### Changed
+
+- `gmail_send` / `gmail_draft_create` / `gmail_draft_update` tool descriptions
+  now teach the body format at the point of use — plain text with `- ` bullets
+  and `1.` / `1)` numbered lines (ASCII or Persian digits), no manual
+  hard-wrapping, `html=true` only for real HTML — so every project and
+  assistant using this server gets the guidance automatically, with no
+  per-project documentation needed. README gained the same section.
+
+## [0.6.2] - 2026-08-22
+
+### Added
+
+- The generated text/html alternative now renders plain-text lists the way
+  Gmail's composer draws them: runs of `- ` / `* ` / `• ` lines become a real
+  `<ul>`, runs of `1. ` / `1) ` lines (ASCII, Persian, or Arabic-Indic digits)
+  a real `<ol>` (with `start` when the run does not begin at 1), each with
+  `dir="auto"` so RTL lists get right-side markers. The text/plain part is
+  untouched — still byte-identical to the caller's body.
+
+## [0.6.1] - 2026-08-22
+
+### Fixed
+
+- Plain-text messages (`gmail_send` / `gmail_draft_create` / `gmail_draft_update`
+  without `html=true`) are now built as `multipart/alternative` with a generated
+  `text/html` part mirroring Gmail's own composer output (one `<div dir="auto">`
+  per line). A plain-text-only draft opened in the Gmail web UI was treated as
+  plain-text mode, and on Send Gmail rewrote the body with hard line breaks at
+  ~70 columns — recipients saw broken mid-sentence paragraphs (hit on a real
+  W Brothers email, 2026-08-22). Gmail-composed mail never shows this because
+  it is always multipart; drafts now match that shape, so sending from the web
+  UI is safe. The `text/plain` part remains the caller's body, byte-identical;
+  `html=true` behavior is unchanged.
+- CI: cap the `mcp` dependency below 2.0 — `mcp 2.0.0` moved
+  `mcp.server.fastmcp`, breaking the import smoke test on a bare
+  `pip install .`.
+
 ## [0.6.0] - 2026-07-06
 
 ### Added

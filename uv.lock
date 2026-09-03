@@ -323,7 +323,7 @@ wheels = [
 
 [[package]]
 name = "google-workspace-mcp"
-version = "0.4.0"
+version = "0.7.0"
 source = { editable = "." }
 dependencies = [
     { name = "google-api-python-client" },
@@ -339,7 +339,7 @@ requires-dist = [
     { name = "google-auth", specifier = ">=2.53.0" },
     { name = "google-auth-httplib2", specifier = ">=0.4.0" },
     { name = "google-auth-oauthlib", specifier = ">=1.4.0" },
-    { name = "mcp", specifier = ">=1.27.2" },
+    { name = "mcp", specifier = ">=1.27.2,<2" },
 ]
 
 [[package]]

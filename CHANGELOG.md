@@ -10,6 +10,41 @@ only when it is bumped.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-02
+
+### Added
+
+- A **Troubleshooting** section in the README, opening with `invalid_grant:
+  Bad Request` — check the OAuth app's publishing status before anything
+  else, then the causes that survive publishing: a refresh token unused for
+  6 months, and the account owner changing their Google password (which
+  revokes any token holding Gmail scopes).
+
+### Changed
+
+- **Setup no longer says leaving the OAuth app in *Testing* is fine — it
+  isn't, and it broke every account weekly.** Google issues refresh tokens
+  that expire after **7 days** to an External app whose publishing status is
+  *Testing*, unless the app requests only name, email address, and profile;
+  this server requests full Gmail, Calendar, Drive, and Tasks scopes, so
+  every connected account died about once a week with `invalid_grant: Bad
+  Request` (hit on 2026-09-02). The README and `/google-workspace-setup` now
+  walk you through publishing it (**Google Auth Platform → Audience →
+  Publish app**), which requires no verification for personal use under 100
+  users; the only cost is the one-time "Google hasn't verified this app"
+  screen, which *Testing* shows anyway. Tokens issued while the app was in
+  *Testing* keep their 7-day clock, so each account needs one re-authorize
+  after publishing.
+- `accounts_list` now proves each token by refreshing it against Google
+  rather than checking that the token file exists. It used to report
+  `authorized: true` for tokens Google had already expired, which made the
+  weekly failure look like a server bug. A failing account now carries
+  `status` (`no_token`, `unreadable`, `revoked`, or `unreachable`) and a
+  `detail` naming the fix; `authorized` is `null` when Google itself could
+  not be reached. Costs one refresh round trip per configured account.
+- A refresh Google rejects now surfaces as a diagnosis naming the account
+  and the likely cause, instead of a bare `RefreshError: invalid_grant`.
+
 ## [0.6.3] - 2026-08-22
 
 ### Changed

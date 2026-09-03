@@ -32,6 +32,7 @@ A **multi-account** Google Workspace MCP server for [Claude Code](https://code.c
 - [Tools](#tools)
 - [Configuration & storage](#configuration--storage)
 - [Scopes](#scopes)
+- [Troubleshooting](#troubleshooting)
 - [Trust & security](#trust--security)
 - [Repository layout](#repository-layout)
 - [Development](#development)
@@ -82,9 +83,12 @@ Each user creates their own client (free):
 
 1. Go to the [Google Cloud Console](https://console.cloud.google.com) and create a project (or pick one).
 2. **APIs & Services → Enabled APIs & services → + Enable APIs** — enable the **Gmail**, **Google Calendar**, **Google Drive**, and **Google Tasks** APIs.
-3. **APIs & Services → OAuth consent screen** — User type **External**. Fill the required fields. Under **Test users**, add every Google account you intend to connect. (Leaving the app in *Testing* is fine.)
-4. **APIs & Services → Credentials → + Create credentials → OAuth client ID → Application type: Desktop app**. Download the JSON.
-5. Save that JSON as:
+3. **APIs & Services → OAuth consent screen** (newer consoles: **Google Auth Platform**) — user type / audience **External**. Fill the required fields. Adding **Test users** is optional: it only matters while the app stays in *Testing*, which the next step ends.
+4. **Publish the app** — **Google Auth Platform → Audience → Publish app**, moving it from *Testing* to **In production**. Don't skip this. Google issues a refresh token that **expires after 7 days** to any External app left in *Testing*, unless the app asks only for name, email address, and profile ([Refresh token expiration](https://developers.google.com/identity/protocols/oauth2#expiration)). This server asks for full Gmail, Calendar, Drive, and Tasks [scopes](#scopes), so in *Testing* every connected account dies about weekly with `invalid_grant: Bad Request` — see [Troubleshooting](#troubleshooting).
+   - **Verification is not required.** Publishing does not put you through Google's app-verification review for personal use under 100 users; verification is what lifts that 100-user cap ([Google's docs](https://support.google.com/cloud/answer/13464323)).
+   - **The tradeoff** is a one-time **"Google hasn't verified this app"** interstitial on first consent — click **Advanced → Go to *(your app)* (unsafe)** to continue. *Testing* shows you the same screen, so publishing costs nothing here.
+5. **APIs & Services → Credentials → + Create credentials → OAuth client ID → Application type: Desktop app**. Download the JSON.
+6. Save that JSON as:
 
    ```text
    ~/.config/google-workspace-mcp/credentials.json
@@ -246,6 +250,28 @@ Broad on purpose — these are your own accounts; narrower scopes would force a 
 - `https://www.googleapis.com/auth/tasks`
 
 > Adding a scope (as v0.3.0 did for Tasks) requires re-running `google-workspace-authorize <slug>` for each account.
+
+> Being this far past Google's name/email/profile exemption is also why the OAuth app **must be published** rather than left in *Testing* — see [setup step 4](#1-create-your-own-google-cloud-oauth-client).
+
+## Troubleshooting
+
+### `invalid_grant: Bad Request` on every call
+
+The account's refresh token is dead. Re-authorizing revives it:
+
+```bash
+google-workspace-authorize <slug>
+```
+
+**If it comes back roughly every week, check the OAuth app's publishing status before anything else** — Google Cloud Console → **Google Auth Platform → Audience**. If it reads *Testing*, click **Publish app** ([setup step 4](#1-create-your-own-google-cloud-oauth-client)): an External app in *Testing* is issued refresh tokens that expire after 7 days, and this server's [scopes](#scopes) are nowhere near the name/email/profile exemption. A token handed out while the app was in *Testing* keeps its 7-day clock, so re-authorize each account once after publishing.
+
+Causes that survive **In production** — unavoidable, and each just needs one re-authorize:
+
+- **Unused for 6 months.** Google expires a refresh token that goes that long without being used.
+- **The account's Google password changed.** A refresh token carrying Gmail scopes — this server holds `https://mail.google.com/` — is revoked when its owner changes their password. Other accounts are unaffected.
+- Access revoked by hand at [myaccount.google.com/permissions](https://myaccount.google.com/permissions), or the OAuth client deleted or rotated in the console.
+
+`accounts_list` reports `authorized` by actually refreshing each stored token against Google, so a dead account comes back `authorized: false` with a `status` and a `detail` naming the fix. Before v0.7.0 it only checked that the token *file* existed — a token Google had already expired still reported `authorized: true`, which made this failure look like a server bug.
 
 ## Trust & security
 

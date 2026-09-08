@@ -8,7 +8,7 @@ A **multi-account** Google Workspace MCP server for [Claude Code](https://code.c
 
 [![CI](https://github.com/rajool/google-workspace-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/rajool/google-workspace-mcp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Plugin version](https://img.shields.io/badge/plugin-v0.4.0-5b8cff.svg)](.claude-plugin/plugin.json)
+[![Plugin version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Frajool%2Fgoogle-workspace-mcp%2Fmain%2F.claude-plugin%2Fplugin.json&query=%24.version&label=plugin&prefix=v&color=5b8cff)](.claude-plugin/plugin.json)
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://code.claude.com/docs/en/plugins)
 [![Changelog](https://img.shields.io/badge/changelog-keep%20a%20changelog-orange)](CHANGELOG.md)
 
@@ -22,7 +22,7 @@ A **multi-account** Google Workspace MCP server for [Claude Code](https://code.c
 - **Per-project access control.** Accounts are configured at *runtime*, never baked into code. Each project's `.mcp.json` scopes it to a subset, so a personal project never even sees your work account.
 - **Your own OAuth client.** You bring a (free) Google Cloud OAuth client, so you own the access and get the full tool surface — including things the default `claude.ai` connector can't do, like deleting a draft. Nothing is routed through anyone else's infrastructure.
 - **Secrets stay out of the tree.** The OAuth client and per-account refresh tokens live under `~/.config/google-workspace-mcp/` (written `0600`), never next to code.
-- **38 tools across four services** — see the [catalog](#tools) below.
+- **41 tools across four services** — see the [catalog](#tools) below.
 
 ## Table of contents
 
@@ -174,8 +174,8 @@ Every call requires an `account` slug. `accounts_list` shows the configured acco
 
 | Tool | What it does |
 |---|---|
-| `gmail_send` | Send immediately — `to`/`cc`/`bcc`, plain or HTML, and correct **reply threading** via `thread_id` + `in_reply_to_message_id`. |
-| `gmail_draft_create` / `gmail_draft_update` | Create a draft / overwrite its contents. |
+| `gmail_send` | Send immediately — `to`/`cc`/`bcc`, plain or HTML, and correct **reply threading** via `thread_id` alone. |
+| `gmail_draft_create` / `gmail_draft_update` | Create a draft / overwrite its contents — `thread_id` makes it a threaded reply, quote and headers included. |
 | `gmail_draft_send` / `gmail_draft_delete` | Send a draft / permanently delete one (the thing the default connector can't do). |
 | `gmail_drafts_list` | List drafts, with Gmail query syntax. |
 | `gmail_search` | Search messages (`from:foo subject:bar`), returns sender/subject/date metadata in one round trip. |
@@ -183,10 +183,12 @@ Every call requires an `account` slug. `accounts_list` shows the configured acco
 | `gmail_message_modify` | Add/remove labels (e.g. mark read by removing `UNREAD`). |
 | `gmail_message_trash` | Move to Trash (reversible for 30 days). |
 | `gmail_labels_list` | List all labels. |
-
-**Email body format.** Write `body` as plain text: blank-line paragraphs, `- ` bullets, `1.` / `1)` numbered lines (ASCII or Persian digits). The server sends it as `multipart/alternative` — the `text/plain` part byte-identical to your body, plus a generated Gmail-composer-style `text/html` part (`<div dir="auto">` per line, real `<ul>`/`<ol>` for lists). Recipients see proper paragraphs and Gmail-native bullets/numbering, RTL and LTR lines both lay out correctly, and a draft opened in the Gmail web UI can be edited and sent safely (Gmail hard-wraps plain-text-only messages at ~70 columns on Send; multipart is immune). Never hard-wrap lines yourself; pass `html=true` only when the body is already real HTML.
 | `gmail_label_create` | Create a label (nested via `Parent/Child` names). Idempotent — an existing label is returned as-is. |
 | `gmail_attachment_download` | Download one attachment to a local path (`attachment_id` from a `format=full` message). |
+
+**Email body format.** Write `body` as plain text: blank-line paragraphs, `- ` bullets, `1.` / `1)` numbered lines (ASCII or Persian digits). The server sends it as `multipart/alternative` — the `text/plain` part byte-identical to your body, plus a generated Gmail-composer-style `text/html` part (`<div dir="auto">` per line, real `<ul>`/`<ol>` for lists). Recipients see proper paragraphs and Gmail-native bullets/numbering, RTL and LTR lines both lay out correctly, and a draft opened in the Gmail web UI can be edited and sent safely (Gmail hard-wraps plain-text-only messages at ~70 columns on Send; multipart is immune). Never hard-wrap lines yourself; pass `html=true` only when the body is already real HTML.
+
+**Replies.** Pass `thread_id` and nothing else. The server reads the thread, appends its history below your text exactly as Gmail's web Reply does (`> `-prefixed in the plain part, a nested `<blockquote class="gmail_quote">` in the HTML part), and derives the `In-Reply-To` / `References` headers from the thread's newest message. So `body` is only ever your new message — **never paste earlier messages into it by hand**, or the recipient gets the history twice. Quoting just the newest message reproduces the full thread, because that message already carries every earlier one nested inside it. `quote_history=false` sends into the thread with no quote; `in_reply_to_message_id` overrides the derived header when you already hold the RFC822 Message-Id.
 
 ### Calendar
 
@@ -211,6 +213,7 @@ Every call requires an `account` slug. `accounts_list` shows the configured acco
 | `drive_file_trash` | Move to trash (reversible). |
 | `drive_folder_create` | Create a folder. |
 | `drive_file_share` | Share with someone by email — role from `reader` to `organizer`, optional notification message. |
+| `drive_file_link_access` | Toggle "anyone with the link" access on a file the account owns, and return a direct download URL — enable, hand off, revoke. |
 
 ### Tasks
 
@@ -253,7 +256,7 @@ Broad on purpose — these are your own accounts; narrower scopes would force a 
 - **Your client, your tokens.** The OAuth client and tokens stay on your machine, outside this repo. Never commit `credentials.json` or `tokens/` (the bundled [`.gitignore`](.gitignore) refuses both).
 - **Nothing shared between users.** Each teammate runs their own OAuth client and authorizes their own accounts.
 - **Treat the config dir as a secret store.** Tokens grant broad access to your mail/calendar/drive/tasks — `~/.config/google-workspace-mcp/` deserves the same care as `~/.ssh/`.
-- An MCP server that can send email and share files deserves review before you enable it — the whole surface is ~1,300 lines of Python in [`src/google_workspace_mcp/`](src/google_workspace_mcp/). See [SECURITY.md](SECURITY.md) to report a vulnerability.
+- An MCP server that can send email and share files deserves review before you enable it — the whole surface is ~1,600 lines of Python in [`src/google_workspace_mcp/`](src/google_workspace_mcp/). See [SECURITY.md](SECURITY.md) to report a vulnerability.
 
 ## Repository layout
 
@@ -265,7 +268,7 @@ google-workspace-mcp/
 ├── commands/
 │   └── google-workspace-setup.md    # /google-workspace-setup — guided setup
 ├── src/google_workspace_mcp/
-│   ├── server.py                    # the MCP server — all 38 tools
+│   ├── server.py                    # the MCP server — all 41 tools
 │   ├── auth.py                      # token load/refresh + Google service builders
 │   ├── accounts.py                  # runtime account registry + GWM_ACCOUNTS scoping
 │   └── authorize.py                 # standalone OAuth consent flow (CLI)
@@ -289,7 +292,9 @@ uv run python -c "from google_workspace_mcp import server"   # import smoke test
 claude plugin validate . --strict         # validate plugin + marketplace manifests
 ```
 
-A user-facing change bumps `version` in [`.claude-plugin/plugin.json`](.claude-plugin/plugin.json), [`pyproject.toml`](pyproject.toml), and `src/google_workspace_mcp/__init__.py`, and adds a [`CHANGELOG.md`](CHANGELOG.md) entry — installed projects pick it up on `/plugin marketplace update`.
+A user-facing change bumps `version` in **five places across four files** — [`.claude-plugin/plugin.json`](.claude-plugin/plugin.json), [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) (**twice**: the top-level `version` *and* `plugins[0].version`), [`pyproject.toml`](pyproject.toml), and `src/google_workspace_mcp/__init__.py` — then runs `uv lock` (which updates a sixth copy inside [`uv.lock`](uv.lock)) and adds a [`CHANGELOG.md`](CHANGELOG.md) entry. Installed projects pick it up on `/plugin marketplace update`.
+
+> Miss `plugins[0].version` and `claude plugin validate . --strict` fails the build: at install time `plugin.json` wins, so a stale entry version is silently ignored and the validator treats that as an error. CI's **Versions agree** step checks every copy up front.
 
 ## Contributing
 

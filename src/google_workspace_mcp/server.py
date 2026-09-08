@@ -13,7 +13,7 @@ import io
 import mimetypes
 import re
 from email.message import EmailMessage
-from email.utils import formataddr
+from email.utils import formataddr, parseaddr, parsedate_to_datetime
 from html import escape
 from pathlib import Path
 from typing import Any, Literal
@@ -43,9 +43,14 @@ def _build_mime(
     html: bool = False,
     in_reply_to: str | None = None,
     references: str | None = None,
+    quote: dict[str, Any] | None = None,
     attachments: list[str] | None = None,
 ) -> str:
-    """Return a base64url-encoded MIME message ready for Gmail."""
+    """Return a base64url-encoded MIME message ready for Gmail.
+
+    `quote` is the reply material from `_thread_quote`; when given, its
+    history is appended below the new text in every part of the message.
+    """
     msg = EmailMessage()
     msg["From"] = sender
     msg["To"] = ", ".join(to)
@@ -58,10 +63,15 @@ def _build_mime(
         msg["In-Reply-To"] = in_reply_to
         msg["References"] = references or in_reply_to
     if html:
-        msg.set_content(body, subtype="html")
+        msg.set_content(
+            body if quote is None else f'{body}<br>{quote["html"]}', subtype="html"
+        )
     else:
-        msg.set_content(body)
-        msg.add_alternative(_plain_to_html(body), subtype="html")
+        msg.set_content(body if quote is None else f'{body}\n\n\n{quote["text"]}')
+        html_body = _plain_to_html(body)
+        if quote is not None:
+            html_body = f'{html_body}<br>{quote["html"]}'
+        msg.add_alternative(html_body, subtype="html")
     for raw_path in attachments or []:
         path = Path(raw_path).expanduser()
         if not path.is_file():
@@ -127,6 +137,105 @@ def _plain_to_html(body: str) -> str:
             )
             i += 1
     return "".join(out)
+
+
+_QUOTE_BQ_STYLE = (
+    "margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex"
+)
+
+
+def _extract_html_body(part: dict) -> str | None:
+    """Return the first text/html body in a Gmail payload tree, decoded."""
+    if part.get("mimeType") == "text/html":
+        data = (part.get("body") or {}).get("data")
+        if data:
+            return base64.urlsafe_b64decode(data + "===").decode(
+                "utf-8", errors="replace"
+            )
+    for sub in part.get("parts", []) or []:
+        html_body = _extract_html_body(sub)
+        if html_body:
+            return html_body
+    return None
+
+
+def _quote_when(date_header: str) -> str:
+    """Format a Date header the way Gmail writes it in an attribution line.
+
+    "Mon, Aug 24, 2026 at 12:24 PM", with the narrow no-break space (U+202F)
+    Gmail puts before AM/PM. Rendered in the message's own UTC offset, which
+    is what the header carries; falls back to the raw header if unparseable.
+    """
+    try:
+        dt = parsedate_to_datetime(date_header)
+    except (TypeError, ValueError):
+        return date_header
+    hour = dt.hour % 12 or 12
+    ampm = "AM" if dt.hour < 12 else "PM"
+    return f"{dt:%a}, {dt:%b} {dt.day}, {dt.year} at {hour}:{dt.minute:02d}\u202f{ampm}"
+
+
+def _quote_prefix(text: str) -> str:
+    """Prefix each line with Gmail's "> ", deepening already-quoted lines."""
+    return "\n".join(
+        (">" + line) if line.startswith(">") else f"> {line}"
+        for line in text.split("\n")
+    )
+
+
+def _thread_quote(account: str, thread_id: str) -> dict[str, Any] | None:
+    """Build reply material from the newest message of a thread.
+
+    Returns the RFC822 Message-Id and References chain needed for correct
+    threading, plus that message quoted in both flavours: "> "-prefixed text
+    and a Gmail-style nested <blockquote class="gmail_quote">.
+
+    Quoting only the newest message is enough to reproduce the whole thread:
+    it already carries every earlier message nested inside it, exactly as
+    Gmail's web Reply builds it. Returns None when the thread cannot be read
+    (bad id, deleted, missing scope) so a send degrades to an unquoted reply
+    instead of failing outright.
+    """
+    try:
+        thread = (
+            auth.gmail(account)
+            .users()
+            .threads()
+            .get(userId="me", id=thread_id, format="full")
+            .execute()
+        )
+    except HttpError:
+        return None
+    messages = thread.get("messages") or []
+    if not messages:
+        return None
+    payload = messages[-1].get("payload") or {}
+    headers = {h["name"].lower(): h["value"] for h in payload.get("headers", [])}
+    name, addr = parseaddr(headers.get("from", ""))
+    when = _quote_when(headers.get("date", ""))
+    who = f"{name} " if name else ""
+    prev_text = _extract_plain_body(payload) or ""
+    prev_html = _extract_html_body(payload) or _plain_to_html(prev_text)
+    message_id = headers.get("message-id")
+    references = " ".join(
+        ref for ref in (headers.get("references"), message_id) if ref
+    )
+    attr_text = f"On {when} {who}<{addr}> wrote:"
+    attr_html = (
+        f'<div dir="ltr" class="gmail_attr">On {escape(when)} {escape(who)}'
+        f'&lt;<a href="mailto:{escape(addr, quote=True)}">{escape(addr)}</a>&gt;'
+        " wrote:<br></div>"
+    )
+    return {
+        "message_id": message_id,
+        "references": references or None,
+        "text": f"{attr_text}\n{_quote_prefix(prev_text)}" if prev_text else attr_text,
+        "html": (
+            '<div class="gmail_quote gmail_quote_container">'
+            f'{attr_html}<blockquote class="gmail_quote" style="{_QUOTE_BQ_STYLE}">'
+            f"{prev_html}</blockquote></div>"
+        ),
+    }
 
 
 def _from_header(slug: str) -> str:
@@ -198,13 +307,18 @@ def gmail_send(
     html: bool = False,
     thread_id: str | None = None,
     in_reply_to_message_id: str | None = None,
+    quote_history: bool = True,
     attachments: list[str] | None = None,
 ) -> dict:
     """Send an email immediately from the given account.
 
-    For replies, pass thread_id AND in_reply_to_message_id (the RFC822
-    Message-Id header value, NOT the Gmail message id) so the reply
-    threads correctly.
+    Replies: pass thread_id and nothing else. The server reads the thread and
+    quotes its history below your text exactly as Gmail's web Reply does, and
+    derives the In-Reply-To / References headers itself. So write `body` as
+    ONLY the new message — never paste earlier messages into it by hand, or
+    the recipient gets the history twice. (`in_reply_to_message_id` overrides
+    the derived header when you already hold the RFC822 Message-Id;
+    `quote_history=false` sends into the thread with no quote.)
 
     Body format: write `body` as plain text — blank-line paragraphs,
     "- " bullets, "1." / "1)" numbered lines (ASCII or Persian digits).
@@ -217,6 +331,7 @@ def gmail_send(
     attached under its own file name, with the MIME type guessed from that
     name and `application/octet-stream` as the fallback.
     """
+    ctx = _thread_quote(account, thread_id) if thread_id else None
     raw = _build_mime(
         sender=_from_header(account),
         to=to,
@@ -225,7 +340,9 @@ def gmail_send(
         cc=cc,
         bcc=bcc,
         html=html,
-        in_reply_to=in_reply_to_message_id,
+        in_reply_to=in_reply_to_message_id or (ctx or {}).get("message_id"),
+        references=(ctx or {}).get("references"),
+        quote=ctx if quote_history else None,
         attachments=attachments,
     )
     payload: dict[str, Any] = {"raw": raw}
@@ -251,9 +368,18 @@ def gmail_draft_create(
     bcc: list[str] | None = None,
     html: bool = False,
     thread_id: str | None = None,
+    quote_history: bool = True,
     attachments: list[str] | None = None,
 ) -> dict:
     """Create a Gmail draft. Returns {id, message: {...}}.
+
+    Replies: pass thread_id and nothing else. The server reads the thread and
+    quotes its history below your text exactly as Gmail's web Reply does, and
+    derives the In-Reply-To / References headers itself. So write `body` as
+    ONLY the new message — never paste earlier messages into it by hand, or
+    the recipient gets the history twice. (`in_reply_to_message_id` overrides
+    the derived header when you already hold the RFC822 Message-Id;
+    `quote_history=false` sends into the thread with no quote.)
 
     Body format: write `body` as plain text — blank-line paragraphs,
     "- " bullets, "1." / "1)" numbered lines (ASCII or Persian digits).
@@ -266,6 +392,7 @@ def gmail_draft_create(
     attached under its own file name, with the MIME type guessed from that
     name and `application/octet-stream` as the fallback.
     """
+    ctx = _thread_quote(account, thread_id) if thread_id else None
     raw = _build_mime(
         sender=_from_header(account),
         to=to,
@@ -274,6 +401,9 @@ def gmail_draft_create(
         cc=cc,
         bcc=bcc,
         html=html,
+        in_reply_to=(ctx or {}).get("message_id"),
+        references=(ctx or {}).get("references"),
+        quote=ctx if quote_history else None,
         attachments=attachments,
     )
     msg: dict[str, Any] = {"raw": raw}
@@ -299,9 +429,15 @@ def gmail_draft_update(
     cc: list[str] | None = None,
     bcc: list[str] | None = None,
     html: bool = False,
+    thread_id: str | None = None,
+    quote_history: bool = True,
     attachments: list[str] | None = None,
 ) -> dict:
     """Overwrite an existing draft's contents.
+
+    Pass thread_id when the draft is a reply — it keeps the draft attached to
+    that thread (an update without it detaches the draft) and re-quotes the
+    thread's history, so `body` stays just the new text.
 
     Body format: write `body` as plain text — blank-line paragraphs,
     "- " bullets, "1." / "1)" numbered lines (ASCII or Persian digits).
@@ -314,6 +450,7 @@ def gmail_draft_update(
     attached under its own file name, with the MIME type guessed from that
     name and `application/octet-stream` as the fallback.
     """
+    ctx = _thread_quote(account, thread_id) if thread_id else None
     raw = _build_mime(
         sender=_from_header(account),
         to=to,
@@ -322,13 +459,19 @@ def gmail_draft_update(
         cc=cc,
         bcc=bcc,
         html=html,
+        in_reply_to=(ctx or {}).get("message_id"),
+        references=(ctx or {}).get("references"),
+        quote=ctx if quote_history else None,
         attachments=attachments,
     )
+    msg: dict[str, Any] = {"raw": raw}
+    if thread_id:
+        msg["threadId"] = thread_id
     draft = (
         auth.gmail(account)
         .users()
         .drafts()
-        .update(userId="me", id=draft_id, body={"message": {"raw": raw}})
+        .update(userId="me", id=draft_id, body={"message": msg})
         .execute()
     )
     return {"id": draft.get("id"), "message": _msg_summary(draft.get("message", {}))}

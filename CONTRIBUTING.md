@@ -37,11 +37,19 @@ exercise the tools end to end — see the [README setup](README.md#setup).
 - Work on a short-lived branch, keep `main` clean, and merge via pull request.
 - **Commits** follow [Conventional Commits](https://www.conventionalcommits.org/):
   `type(scope): summary`, where `type` is one of `feat fix docs chore refactor`.
-- **User-facing changes** bump `version` in three places —
+- **User-facing changes** bump `version` in **five places across four files** —
   [`.claude-plugin/plugin.json`](.claude-plugin/plugin.json),
+  [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) **twice**
+  (the top-level `version` *and* `plugins[0].version`),
   [`pyproject.toml`](pyproject.toml), and
-  `src/google_workspace_mcp/__init__.py` — run `uv lock`, and add an entry to
+  `src/google_workspace_mcp/__init__.py` — then run `uv lock` (it stores a
+  sixth copy of the version inside [`uv.lock`](uv.lock)) and add an entry to
   [`CHANGELOG.md`](CHANGELOG.md) (Keep a Changelog format).
+  Forgetting `plugins[0].version` breaks CI: `plugin.json` wins at install time,
+  so the entry version is silently ignored and
+  `claude plugin validate . --strict` treats that warning as an error. The
+  **Versions agree** CI step checks every copy, so a half-done bump fails the
+  build rather than shipping.
 - **Adding a tool?** Keep the pattern: an `account: AccountSlug` first
   parameter, a one-line docstring that tells the model when to use it, and a
   trimmed return shape (see `_msg_summary` / `_task_summary`). Update the

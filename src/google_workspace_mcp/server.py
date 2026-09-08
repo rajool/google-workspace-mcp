@@ -256,14 +256,18 @@ def _msg_summary(m: dict) -> dict:
 
 @mcp.tool()
 def accounts_list() -> dict:
-    """List the configured Google accounts and whether each has a valid token."""
+    """List the configured Google accounts and whether each token still works.
+
+    `authorized` is proven by refreshing each token against Google (null
+    if Google could not be reached), not by the token file existing; a
+    dead account carries a `status` and a `detail` naming the fix.
+    """
     out: dict[str, dict] = {}
     for slug, info in ACCOUNTS.items():
-        path = auth.TOKENS_DIR / f"{slug}.json"
         out[slug] = {
             "email": info["email"],
             "name": info.get("name", ""),
-            "authorized": path.exists(),
+            **auth.token_status(slug),
         }
     if not out:
         return {

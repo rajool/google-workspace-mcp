@@ -44,6 +44,7 @@ def _build_mime(
     in_reply_to: str | None = None,
     references: str | None = None,
     quote: dict[str, Any] | None = None,
+    attachments: list[str] | None = None,
 ) -> str:
     """Return a base64url-encoded MIME message ready for Gmail.
 
@@ -71,6 +72,20 @@ def _build_mime(
         if quote is not None:
             html_body = f'{html_body}<br>{quote["html"]}'
         msg.add_alternative(html_body, subtype="html")
+    for raw_path in attachments or []:
+        path = Path(raw_path).expanduser()
+        if not path.is_file():
+            raise FileNotFoundError(f"Attachment not found: {path}")
+        ctype, encoding = mimetypes.guess_type(path.name)
+        if ctype is None or encoding is not None:
+            ctype = "application/octet-stream"
+        maintype, _, subtype = ctype.partition("/")
+        msg.add_attachment(
+            path.read_bytes(),
+            maintype=maintype,
+            subtype=subtype,
+            filename=path.name,
+        )
     return base64.urlsafe_b64encode(msg.as_bytes()).decode()
 
 
@@ -297,6 +312,7 @@ def gmail_send(
     thread_id: str | None = None,
     in_reply_to_message_id: str | None = None,
     quote_history: bool = True,
+    attachments: list[str] | None = None,
 ) -> dict:
     """Send an email immediately from the given account.
 
@@ -314,6 +330,10 @@ def gmail_send(
     part, so lists arrive as Gmail's real bullets/numbering and the draft
     can be opened and sent from the Gmail web UI safely. Never hard-wrap
     lines yourself. Set html=true only for a body that is already HTML.
+
+    `attachments` are paths on the machine running this server. Each is
+    attached under its own file name, with the MIME type guessed from that
+    name and `application/octet-stream` as the fallback.
     """
     ctx = _thread_quote(account, thread_id) if thread_id else None
     raw = _build_mime(
@@ -327,6 +347,7 @@ def gmail_send(
         in_reply_to=in_reply_to_message_id or (ctx or {}).get("message_id"),
         references=(ctx or {}).get("references"),
         quote=ctx if quote_history else None,
+        attachments=attachments,
     )
     payload: dict[str, Any] = {"raw": raw}
     if thread_id:
@@ -352,6 +373,7 @@ def gmail_draft_create(
     html: bool = False,
     thread_id: str | None = None,
     quote_history: bool = True,
+    attachments: list[str] | None = None,
 ) -> dict:
     """Create a Gmail draft. Returns {id, message: {...}}.
 
@@ -369,6 +391,10 @@ def gmail_draft_create(
     part, so lists arrive as Gmail's real bullets/numbering and the draft
     can be opened and sent from the Gmail web UI safely. Never hard-wrap
     lines yourself. Set html=true only for a body that is already HTML.
+
+    `attachments` are paths on the machine running this server. Each is
+    attached under its own file name, with the MIME type guessed from that
+    name and `application/octet-stream` as the fallback.
     """
     ctx = _thread_quote(account, thread_id) if thread_id else None
     raw = _build_mime(
@@ -382,6 +408,7 @@ def gmail_draft_create(
         in_reply_to=(ctx or {}).get("message_id"),
         references=(ctx or {}).get("references"),
         quote=ctx if quote_history else None,
+        attachments=attachments,
     )
     msg: dict[str, Any] = {"raw": raw}
     if thread_id:
@@ -408,6 +435,7 @@ def gmail_draft_update(
     html: bool = False,
     thread_id: str | None = None,
     quote_history: bool = True,
+    attachments: list[str] | None = None,
 ) -> dict:
     """Overwrite an existing draft's contents.
 
@@ -421,6 +449,10 @@ def gmail_draft_update(
     part, so lists arrive as Gmail's real bullets/numbering and the draft
     can be opened and sent from the Gmail web UI safely. Never hard-wrap
     lines yourself. Set html=true only for a body that is already HTML.
+
+    `attachments` are paths on the machine running this server. Each is
+    attached under its own file name, with the MIME type guessed from that
+    name and `application/octet-stream` as the fallback.
     """
     ctx = _thread_quote(account, thread_id) if thread_id else None
     raw = _build_mime(
@@ -434,6 +466,7 @@ def gmail_draft_update(
         in_reply_to=(ctx or {}).get("message_id"),
         references=(ctx or {}).get("references"),
         quote=ctx if quote_history else None,
+        attachments=attachments,
     )
     msg: dict[str, Any] = {"raw": raw}
     if thread_id:

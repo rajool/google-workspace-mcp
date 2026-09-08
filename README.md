@@ -178,8 +178,8 @@ Every call requires an `account` slug. `accounts_list` shows the configured acco
 
 | Tool | What it does |
 |---|---|
-| `gmail_send` | Send immediately — `to`/`cc`/`bcc`, plain or HTML, and correct **reply threading** via `thread_id` alone. |
-| `gmail_draft_create` / `gmail_draft_update` | Create a draft / overwrite its contents — `thread_id` makes it a threaded reply, quote and headers included. |
+| `gmail_send` | Send immediately — `to`/`cc`/`bcc`, plain or HTML, local-file `attachments`, and correct **reply threading** via `thread_id` alone. |
+| `gmail_draft_create` / `gmail_draft_update` | Create a draft / overwrite its contents — `thread_id` makes it a threaded reply, quote and headers included; `attachments` ride along. |
 | `gmail_draft_send` / `gmail_draft_delete` | Send a draft / permanently delete one (the thing the default connector can't do). |
 | `gmail_drafts_list` | List drafts, with Gmail query syntax. |
 | `gmail_search` | Search messages (`from:foo subject:bar`), returns sender/subject/date metadata in one round trip. |
@@ -193,6 +193,8 @@ Every call requires an `account` slug. `accounts_list` shows the configured acco
 **Email body format.** Write `body` as plain text: blank-line paragraphs, `- ` bullets, `1.` / `1)` numbered lines (ASCII or Persian digits). The server sends it as `multipart/alternative` — the `text/plain` part byte-identical to your body, plus a generated Gmail-composer-style `text/html` part (`<div dir="auto">` per line, real `<ul>`/`<ol>` for lists). Recipients see proper paragraphs and Gmail-native bullets/numbering, RTL and LTR lines both lay out correctly, and a draft opened in the Gmail web UI can be edited and sent safely (Gmail hard-wraps plain-text-only messages at ~70 columns on Send; multipart is immune). Never hard-wrap lines yourself; pass `html=true` only when the body is already real HTML.
 
 **Replies.** Pass `thread_id` and nothing else. The server reads the thread, appends its history below your text exactly as Gmail's web Reply does (`> `-prefixed in the plain part, a nested `<blockquote class="gmail_quote">` in the HTML part), and derives the `In-Reply-To` / `References` headers from the thread's newest message. So `body` is only ever your new message — **never paste earlier messages into it by hand**, or the recipient gets the history twice. Quoting just the newest message reproduces the full thread, because that message already carries every earlier one nested inside it. `quote_history=false` sends into the thread with no quote; `in_reply_to_message_id` overrides the derived header when you already hold the RFC822 Message-Id.
+
+**Attachments.** Pass `attachments` as a list of paths on the machine running the server. Each file is attached under its own name with the MIME type guessed from it (`application/octet-stream` when unknown); a path that does not exist raises instead of quietly sending without the file. Attachments are added after the body, so plain-text mail keeps its `multipart/alternative` shape (inside `multipart/mixed`) and replies keep their quoted history. Gmail's API caps a message at about 35 MB.
 
 ### Calendar
 

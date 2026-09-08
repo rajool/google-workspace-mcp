@@ -285,7 +285,7 @@ Causes that survive **In production** — unavoidable, and each just needs one r
 - **Your client, your tokens.** The OAuth client and tokens stay on your machine, outside this repo. Never commit `credentials.json` or `tokens/` (the bundled [`.gitignore`](.gitignore) refuses both).
 - **Nothing shared between users.** Each teammate runs their own OAuth client and authorizes their own accounts.
 - **Treat the config dir as a secret store.** Tokens grant broad access to your mail/calendar/drive/tasks — `~/.config/google-workspace-mcp/` deserves the same care as `~/.ssh/`.
-- An MCP server that can send email and share files deserves review before you enable it — the whole surface is ~1,600 lines of Python in [`src/google_workspace_mcp/`](src/google_workspace_mcp/). See [SECURITY.md](SECURITY.md) to report a vulnerability.
+- An MCP server that can send email and share files deserves review before you enable it — the whole surface is ~1,800 lines of Python in [`src/google_workspace_mcp/`](src/google_workspace_mcp/). See [SECURITY.md](SECURITY.md) to report a vulnerability.
 
 ## Repository layout
 

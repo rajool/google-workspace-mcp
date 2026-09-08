@@ -10,6 +10,36 @@ only when it is bumped.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-07
+
+### Fixed
+
+- **Replies now carry the thread's history.** `thread_id` attaches a message to
+  a thread, but Gmail quotes nothing for you — so a reply built from `body`
+  alone reached the recipient with every earlier message gone, and callers had
+  to hand-build the quote chain (or, far more often, silently drop it).
+  `gmail_send` / `gmail_draft_create` / `gmail_draft_update` now read the
+  thread and append its history below the new text the way Gmail's web Reply
+  does: `"> "`-prefixed in the `text/plain` part (already-quoted lines deepen
+  to `">> "`) and a nested `<blockquote class="gmail_quote">` in the
+  `text/html` part. Quoting the thread's newest message is enough — it already
+  carries the whole earlier chain nested inside it. Pass `quote_history=false`
+  to opt out. Because the fix lives in the server, every project and assistant
+  gets it with no per-project documentation.
+- **`In-Reply-To` / `References` are derived from the thread.** Previously only
+  `gmail_send` set them, and only when the caller looked up the RFC822
+  Message-Id itself; drafts created into a thread carried no threading headers
+  at all, so non-Gmail clients broke the conversation apart.
+  `in_reply_to_message_id` remains as an override.
+- **`gmail_draft_update` no longer detaches a draft from its thread.** It
+  overwrote the draft with a bare `raw` message and no `threadId`; it now takes
+  an optional `thread_id` and preserves the attachment (and re-quotes).
+
+### Added
+
+- Test suite (`tests/`) covering reply quoting, threading headers, quote
+  depth, and graceful degradation when a thread cannot be read. CI runs it.
+
 ## [0.6.3] - 2026-08-22
 
 ### Changed

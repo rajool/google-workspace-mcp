@@ -14,9 +14,18 @@ to paste secrets into chat — only to place files or click Allow.
 - OAuth client secret at `~/.config/google-workspace-mcp/credentials.json`
   (honor `$GWM_HOME` / `$GWM_CREDENTIALS` / `$XDG_CONFIG_HOME`). If missing,
   walk them through Google Cloud Console (own project; enable **Gmail**,
-  **Calendar**, **Drive** APIs; OAuth consent screen External + add their
-  accounts as **test users**; create an **OAuth client → Desktop app**;
-  download and save to that path).
+  **Calendar**, **Drive**, **Tasks** APIs; OAuth consent screen / Google
+  Auth Platform audience **External**; create an **OAuth client → Desktop
+  app**; download and save to that path).
+- **Publishing status — verify this even when `credentials.json` already
+  exists.** Google Auth Platform → **Audience** must read *In production*.
+  An External app left in *Testing* is issued refresh tokens that expire
+  after **7 days** with these scopes, so every account starts failing
+  weekly with `invalid_grant: Bad Request`. Have them click **Publish
+  app** — no verification is required for personal use under 100 users,
+  and the "Google hasn't verified this app" screen appears in *Testing*
+  too. Tokens issued while it was in *Testing* keep their 7-day clock, so
+  re-authorize each account once after publishing.
 - Server binary on PATH: `google-workspace-mcp --help`. If missing:
   `uv tool install git+https://github.com/rajool/google-workspace-mcp`
   (or `uv tool install .` from a local clone).
@@ -63,5 +72,7 @@ in the registry). Tell the user to restart Claude Code / reconnect MCP.
 ## 5. Verify
 
 Call `accounts_list` and confirm the expected accounts show
-`authorized: true`. Optionally send one test email per account to the
-user's own address.
+`authorized: true`. It refreshes each token against Google, so a `false`
+is real — read the account's `detail`; a `revoked` status means checking
+the publishing status (step 1) before re-authorizing. Optionally send one
+test email per account to the user's own address.

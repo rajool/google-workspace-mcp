@@ -10,6 +10,19 @@ only when it is bumped.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-08
+
+### Added
+
+- `attachments` on `gmail_send` / `gmail_draft_create` / `gmail_draft_update`:
+  a list of paths on the machine running the server, each attached under its
+  own file name with the MIME type guessed from it (`application/octet-stream`
+  as the fallback). A path that does not exist raises `FileNotFoundError`
+  rather than quietly sending the message without the file. Attachments are
+  added after the body, so plain-text mail keeps its `multipart/alternative`
+  shape inside `multipart/mixed` and replies keep their quoted history.
+  Contributed by @zeroamplitude (#11).
+
 ## [0.8.0] - 2026-09-08
 
 ### Added

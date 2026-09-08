@@ -47,16 +47,73 @@ jobs:
           for f in .claude-plugin/plugin.json .claude-plugin/marketplace.json accounts.example.json; do
             python3 -c "import json,sys; json.load(open(sys.argv[1])); print(sys.argv[1], 'ok')" "$f"
           done
-      - name: Versions agree (plugin.json, pyproject.toml, __init__.py)
+      - name: Versions agree (5 manifest fields + uv.lock)
         run: |
           python3 - <<'EOF'
           import json, re, sys, tomllib
-          plugin = json.load(open(".claude-plugin/plugin.json"))["version"]
-          pyproject = tomllib.load(open("pyproject.toml", "rb"))["project"]["version"]
-          init = re.search(r'__version__ = "([^"]+)"',
-                           open("src/google_workspace_mcp/__init__.py").read()).group(1)
-          print(f"plugin.json={plugin} pyproject={pyproject} __init__={init}")
-          sys.exit(0 if plugin == pyproject == init else 1)
+          marketplace = json.load(open(".claude-plugin/marketplace.json"))
+          lock = tomllib.load(open("uv.lock", "rb"))
+          versions = {
+              ".claude-plugin/plugin.json": json.load(open(".claude-plugin/plugin.json"))["version"],
+              ".claude-plugin/marketplace.json version": marketplace["version"],
+              ".claude-plugin/marketplace.json plugins[0].version": marketplace["plugins"][0]["version"],
+              "pyproject.toml": tomllib.load(open("pyproject.toml", "rb"))["project"]["version"],
+              "src/google_workspace_mcp/__init__.py": re.search(
+                  r'__version__ = "([^"]+)"',
+                  open("src/google_workspace_mcp/__init__.py").read()).group(1),
+              # Not hand-edited — stale whenever `uv lock` was skipped.
+              "uv.lock (run `uv lock`)": next(
+                  p["version"] for p in lock["package"]
+                  if p["name"] == "google-workspace-mcp"),
+          }
+          pad = max(map(len, versions))
+          for name, value in versions.items():
+              print(f"  {name:<{pad}}  {value}")
+          distinct = sorted(set(versions.values()))
+          if len(distinct) > 1:
+              print(f"\n::error::Version mismatch {distinct}. A user-facing change must bump all "
+                    "five manifest fields and re-run `uv lock` (see CONTRIBUTING.md). Note that "
+                    "plugins[0].version is also enforced by 'claude plugin validate --strict'.")
+              sys.exit(1)
+          print(f"\nAll copies agree: {distinct[0]}")
+          EOF
+
+      - name: README catalog covers every tool
+        run: |
+          python3 - <<'EOF'
+          import re, sys
+          # server.py is the source of truth. CONTRIBUTING requires every new tool
+          # to reach the README catalog and the advertised total to stay honest;
+          # 0.5.0 and 0.6.0 each broke one of those silently, so assert both.
+          tools = re.findall(r'@mcp\.tool\(\)\s*\n\s*(?:async\s+)?def\s+(\w+)',
+                             open("src/google_workspace_mcp/server.py").read())
+          readme = open("README.md").read()
+          failed = False
+
+          missing = [t for t in tools if f"`{t}`" not in readme]
+          if missing:
+              print(f"::error::{len(missing)} tool(s) missing from the README catalog: "
+                    f"{', '.join(missing)}. Add a row to the matching table.")
+              failed = True
+
+          claims = {
+              "the 'tools across four services' bullet": r"\*\*(\d+) tools across four services\*\*",
+              "the repository-layout comment": r"the MCP server . all (\d+) tools",
+          }
+          for where, pattern in claims.items():
+              found = re.search(pattern, readme)
+              if not found:
+                  print(f"::error::Could not find {where} in README.md. If you reworded it, "
+                        "update this step's pattern to match.")
+                  failed = True
+              elif int(found.group(1)) != len(tools):
+                  print(f"::error::README.md claims {found.group(1)} tools in {where}, but "
+                        f"server.py defines {len(tools)}. Update the README.")
+                  failed = True
+
+          if failed:
+              sys.exit(1)
+          print(f"  {len(tools)} tools, all present in the catalog and both totals agree")
           EOF
 
   plugin:

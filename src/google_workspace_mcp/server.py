@@ -879,6 +879,14 @@ def calendar_event_delete(
 
 _DRIVE_FIELDS = "id, name, mimeType, parents, webViewLink, webContentLink, modifiedTime, size, owners(emailAddress, displayName)"
 
+# Office formats Drive can convert into its own editable types. Used when
+# creating a native Doc/Sheet/Slides from a local file, and when revising one.
+_GOOGLE_NATIVE = {
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "application/vnd.google-apps.document",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "application/vnd.google-apps.spreadsheet",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": "application/vnd.google-apps.presentation",
+}
+
 
 @mcp.tool()
 def drive_search(
@@ -979,12 +987,7 @@ def drive_file_upload(
     if convert_to_google_doc:
         # Drive treats the destination mimeType in metadata as the
         # target format; the source mimeType comes from the media body.
-        conv = {
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "application/vnd.google-apps.document",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "application/vnd.google-apps.spreadsheet",
-            "application/vnd.openxmlformats-officedocument.presentationml.presentation": "application/vnd.google-apps.presentation",
-        }
-        target = conv.get(mime_type)
+        target = _GOOGLE_NATIVE.get(mime_type)
         if target:
             metadata["mimeType"] = target
 
@@ -997,6 +1000,55 @@ def drive_file_upload(
             media_body=media,
             fields=_DRIVE_FIELDS,
             supportsAllDrives=True,
+        )
+        .execute()
+    )
+    return file
+
+
+@mcp.tool()
+def drive_file_update_content(
+    account: AccountSlug,
+    file_id: str,
+    local_path: str,
+    name: str | None = None,
+    mime_type: str | None = None,
+    convert_to_google_doc: bool = False,
+    keep_revision_forever: bool = False,
+) -> dict:
+    """Replace an existing file's contents in place. The file keeps its ID,
+    link and sharing, and the previous contents stay in Drive's revision
+    history. Use this rather than `drive_file_upload` to revise something
+    already in Drive: uploading again under the same name creates a second
+    file, it does not version the first. `convert_to_google_doc=True` revises
+    a native Doc/Sheet/Slides from a local .docx/.xlsx/.pptx."""
+    path = Path(local_path).expanduser()
+    if not path.is_file():
+        raise FileNotFoundError(local_path)
+
+    if mime_type is None:
+        mime_type, _ = mimetypes.guess_type(str(path))
+        mime_type = mime_type or "application/octet-stream"
+
+    metadata: dict[str, Any] = {}
+    if name:
+        metadata["name"] = name
+    if convert_to_google_doc:
+        target = _GOOGLE_NATIVE.get(mime_type)
+        if target:
+            metadata["mimeType"] = target
+
+    media = MediaFileUpload(str(path), mimetype=mime_type, resumable=True)
+    file = (
+        auth.drive(account)
+        .files()
+        .update(
+            fileId=file_id,
+            body=metadata,
+            media_body=media,
+            fields=_DRIVE_FIELDS,
+            supportsAllDrives=True,
+            keepRevisionForever=keep_revision_forever,
         )
         .execute()
     )

@@ -10,6 +10,21 @@ only when it is bumped.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-08
+
+### Added
+
+- `drive_file_update_content` — replace an existing Drive file's contents in
+  place via `files().update()`, so the file keeps its ID, link and sharing and
+  the previous contents stay in Drive's revision history. Uploading again under
+  the same name with `drive_file_upload` creates a second file rather than a new
+  version, which left no way to revise something already shared. Optional
+  `name` rename, `convert_to_google_doc` to revise a native Doc/Sheet/Slides
+  from a local `.docx`/`.xlsx`/`.pptx`, and `keep_revision_forever`. No new
+  OAuth scope. The Office-to-Google conversion map is now a module-level
+  `_GOOGLE_NATIVE` shared with `drive_file_upload`. Contributed by
+  @zeroamplitude (#10).
+
 ## [0.9.0] - 2026-09-08
 
 ### Added

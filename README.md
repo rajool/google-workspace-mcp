@@ -22,7 +22,7 @@ A **multi-account** Google Workspace MCP server for [Claude Code](https://code.c
 - **Per-project access control.** Accounts are configured at *runtime*, never baked into code. Each project's `.mcp.json` scopes it to a subset, so a personal project never even sees your work account.
 - **Your own OAuth client.** You bring a (free) Google Cloud OAuth client, so you own the access and get the full tool surface — including things the default `claude.ai` connector can't do, like deleting a draft. Nothing is routed through anyone else's infrastructure.
 - **Secrets stay out of the tree.** The OAuth client and per-account refresh tokens live under `~/.config/google-workspace-mcp/` (written `0600`), never next to code.
-- **41 tools across four services** — see the [catalog](#tools) below.
+- **42 tools across four services** — see the [catalog](#tools) below.
 
 ## Table of contents
 
@@ -215,6 +215,7 @@ Every call requires an `account` slug. `accounts_list` shows the configured acco
 | `drive_file_get` | Full metadata for one file. |
 | `drive_file_download` | Download any file; **exports** Google Docs/Sheets/Slides to e.g. PDF or CSV. |
 | `drive_file_upload` | Upload a local file; optionally **convert** `.docx`/`.xlsx`/`.pptx` to native Google formats. |
+| `drive_file_update_content` | Replace an existing file's contents **in place** — same ID, link and sharing, previous version kept in Drive's revision history. Optional rename, `convert_to_google_doc` to revise a native Doc/Sheet/Slides from a local `.docx`/`.xlsx`/`.pptx`, `keep_revision_forever`. |
 | `drive_file_move` / `drive_file_rename` | Move between folders / rename. |
 | `drive_file_trash` | Move to trash (reversible). |
 | `drive_folder_create` | Create a folder. |
@@ -284,7 +285,7 @@ Causes that survive **In production** — unavoidable, and each just needs one r
 - **Your client, your tokens.** The OAuth client and tokens stay on your machine, outside this repo. Never commit `credentials.json` or `tokens/` (the bundled [`.gitignore`](.gitignore) refuses both).
 - **Nothing shared between users.** Each teammate runs their own OAuth client and authorizes their own accounts.
 - **Treat the config dir as a secret store.** Tokens grant broad access to your mail/calendar/drive/tasks — `~/.config/google-workspace-mcp/` deserves the same care as `~/.ssh/`.
-- An MCP server that can send email and share files deserves review before you enable it — the whole surface is ~1,600 lines of Python in [`src/google_workspace_mcp/`](src/google_workspace_mcp/). See [SECURITY.md](SECURITY.md) to report a vulnerability.
+- An MCP server that can send email and share files deserves review before you enable it — the whole surface is ~1,800 lines of Python in [`src/google_workspace_mcp/`](src/google_workspace_mcp/). See [SECURITY.md](SECURITY.md) to report a vulnerability.
 
 ## Repository layout
 
@@ -296,7 +297,7 @@ google-workspace-mcp/
 ├── commands/
 │   └── google-workspace-setup.md    # /google-workspace-setup — guided setup
 ├── src/google_workspace_mcp/
-│   ├── server.py                    # the MCP server — all 41 tools
+│   ├── server.py                    # the MCP server — all 42 tools
 │   ├── auth.py                      # token load/refresh + Google service builders
 │   ├── accounts.py                  # runtime account registry + GWM_ACCOUNTS scoping
 │   └── authorize.py                 # standalone OAuth consent flow (CLI)

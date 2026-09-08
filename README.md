@@ -274,7 +274,7 @@ Causes that survive **In production** — unavoidable, and each just needs one r
 - **The account's Google password changed.** A refresh token carrying Gmail scopes — this server holds `https://mail.google.com/` — is revoked when its owner changes their password. Other accounts are unaffected.
 - Access revoked by hand at [myaccount.google.com/permissions](https://myaccount.google.com/permissions), or the OAuth client deleted or rotated in the console.
 
-`accounts_list` reports `authorized` by actually refreshing each stored token against Google, so a dead account comes back `authorized: false` with a `status` and a `detail` naming the fix. Before v0.7.0 it only checked that the token *file* existed — a token Google had already expired still reported `authorized: true`, which made this failure look like a server bug.
+`accounts_list` reports `authorized` by actually refreshing each stored token against Google, so a dead account comes back `authorized: false` with a `status` and a `detail` naming the fix. Before v0.8.0 it only checked that the token *file* existed — a token Google had already expired still reported `authorized: true`, which made this failure look like a server bug.
 
 ## Trust & security
 

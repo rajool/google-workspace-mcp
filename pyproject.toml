@@ -11,6 +11,9 @@ dependencies = [
     "mcp>=1.27.2,<2",
 ]
 
+[dependency-groups]
+dev = ["pytest>=8"]
+
 [project.scripts]
 google-workspace-mcp = "google_workspace_mcp.server:main"
 google-workspace-authorize = "google_workspace_mcp.authorize:main"

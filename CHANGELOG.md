@@ -10,7 +10,7 @@ only when it is bumped.
 
 ## [Unreleased]
 
-## [0.7.0] - 2026-09-02
+## [0.8.0] - 2026-09-08
 
 ### Added
 
@@ -19,6 +19,12 @@ only when it is bumped.
   else, then the causes that survive publishing: a refresh token unused for
   6 months, and the account owner changing their Google password (which
   revokes any token holding Gmail scopes).
+- CI: **Versions agree** now checks all five manifest version fields plus the
+  copy in `uv.lock`, instead of three — the validator enforces
+  `plugins[0].version` but ignores the top-level marketplace `version`.
+- CI: **README catalog covers every tool** asserts that each `@mcp.tool()` has
+  a catalog row and that both advertised totals match, so a new tool cannot
+  ship undocumented or leave the count stale.
 
 ### Changed
 
@@ -44,6 +50,50 @@ only when it is bumped.
   not be reached. Costs one refresh round trip per configured account.
 - A refresh Google rejects now surfaces as a diagnosis naming the account
   and the likely cause, instead of a bare `RefreshError: invalid_grant`.
+
+### Fixed
+
+- README drift: both advertised tool totals said **38** while `server.py`
+  defines **41**, `drive_file_link_access` (0.6.0) was missing from the Drive
+  catalog, the version badge was pinned at `v0.4.0` (it now reads
+  `plugin.json` live), and the security note's line count was stale.
+- The documented version-bump ritual omitted `.claude-plugin/marketplace.json`,
+  which carries the version **twice** (top-level `version` and
+  `plugins[0].version`). A stale `plugins[0].version` fails the `plugin` CI
+  job, because `plugin.json` wins at install time and
+  `claude plugin validate . --strict` treats the resulting warning as an error.
+  `CONTRIBUTING.md`, the README **Development** section and the pull-request
+  template now all list five fields across four files.
+
+## [0.7.0] - 2026-09-07
+
+### Fixed
+
+- **Replies now carry the thread's history.** `thread_id` attaches a message to
+  a thread, but Gmail quotes nothing for you — so a reply built from `body`
+  alone reached the recipient with every earlier message gone, and callers had
+  to hand-build the quote chain (or, far more often, silently drop it).
+  `gmail_send` / `gmail_draft_create` / `gmail_draft_update` now read the
+  thread and append its history below the new text the way Gmail's web Reply
+  does: `"> "`-prefixed in the `text/plain` part (already-quoted lines deepen
+  to `">> "`) and a nested `<blockquote class="gmail_quote">` in the
+  `text/html` part. Quoting the thread's newest message is enough — it already
+  carries the whole earlier chain nested inside it. Pass `quote_history=false`
+  to opt out. Because the fix lives in the server, every project and assistant
+  gets it with no per-project documentation.
+- **`In-Reply-To` / `References` are derived from the thread.** Previously only
+  `gmail_send` set them, and only when the caller looked up the RFC822
+  Message-Id itself; drafts created into a thread carried no threading headers
+  at all, so non-Gmail clients broke the conversation apart.
+  `in_reply_to_message_id` remains as an override.
+- **`gmail_draft_update` no longer detaches a draft from its thread.** It
+  overwrote the draft with a bare `raw` message and no `threadId`; it now takes
+  an optional `thread_id` and preserves the attachment (and re-quotes).
+
+### Added
+
+- Test suite (`tests/`) covering reply quoting, threading headers, quote
+  depth, and graceful degradation when a thread cannot be read. CI runs it.
 
 ## [0.6.3] - 2026-08-22
 

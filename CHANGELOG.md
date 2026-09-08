@@ -10,6 +10,29 @@ only when it is bumped.
 
 ## [Unreleased]
 
+### Fixed
+
+- README drift: both advertised tool totals said **38** while `server.py`
+  defines **41**, `drive_file_link_access` (0.6.0) was missing from the Drive
+  catalog, the version badge was pinned at `v0.4.0` (it now reads
+  `plugin.json` live), and the security note's line count was stale.
+- The documented version-bump ritual omitted `.claude-plugin/marketplace.json`,
+  which carries the version **twice** (top-level `version` and
+  `plugins[0].version`). A stale `plugins[0].version` fails the `plugin` CI
+  job, because `plugin.json` wins at install time and
+  `claude plugin validate . --strict` treats the resulting warning as an error.
+  `CONTRIBUTING.md`, the README **Development** section and the pull-request
+  template now all list five fields across four files.
+
+### Added
+
+- CI: **Versions agree** now checks all five manifest version fields plus the
+  copy in `uv.lock`, instead of three — the validator enforces
+  `plugins[0].version` but ignores the top-level marketplace `version`.
+- CI: **README catalog covers every tool** asserts that each `@mcp.tool()` has
+  a catalog row and that both advertised totals match, so a new tool cannot
+  ship undocumented or leave the count stale.
+
 ## [0.7.0] - 2026-09-07
 
 ### Fixed

@@ -8,7 +8,7 @@ A **multi-account** Google Workspace MCP server for [Claude Code](https://code.c
 
 [![CI](https://github.com/rajool/google-workspace-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/rajool/google-workspace-mcp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Plugin version](https://img.shields.io/badge/plugin-v0.4.0-5b8cff.svg)](.claude-plugin/plugin.json)
+[![Plugin version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Frajool%2Fgoogle-workspace-mcp%2Fmain%2F.claude-plugin%2Fplugin.json&query=%24.version&label=plugin&prefix=v&color=5b8cff)](.claude-plugin/plugin.json)
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://code.claude.com/docs/en/plugins)
 [![Changelog](https://img.shields.io/badge/changelog-keep%20a%20changelog-orange)](CHANGELOG.md)
 
@@ -22,7 +22,7 @@ A **multi-account** Google Workspace MCP server for [Claude Code](https://code.c
 - **Per-project access control.** Accounts are configured at *runtime*, never baked into code. Each project's `.mcp.json` scopes it to a subset, so a personal project never even sees your work account.
 - **Your own OAuth client.** You bring a (free) Google Cloud OAuth client, so you own the access and get the full tool surface — including things the default `claude.ai` connector can't do, like deleting a draft. Nothing is routed through anyone else's infrastructure.
 - **Secrets stay out of the tree.** The OAuth client and per-account refresh tokens live under `~/.config/google-workspace-mcp/` (written `0600`), never next to code.
-- **38 tools across four services** — see the [catalog](#tools) below.
+- **41 tools across four services** — see the [catalog](#tools) below.
 
 ## Table of contents
 
@@ -213,6 +213,7 @@ Every call requires an `account` slug. `accounts_list` shows the configured acco
 | `drive_file_trash` | Move to trash (reversible). |
 | `drive_folder_create` | Create a folder. |
 | `drive_file_share` | Share with someone by email — role from `reader` to `organizer`, optional notification message. |
+| `drive_file_link_access` | Toggle "anyone with the link" access on a file the account owns, and return a direct download URL — enable, hand off, revoke. |
 
 ### Tasks
 
@@ -255,7 +256,7 @@ Broad on purpose — these are your own accounts; narrower scopes would force a 
 - **Your client, your tokens.** The OAuth client and tokens stay on your machine, outside this repo. Never commit `credentials.json` or `tokens/` (the bundled [`.gitignore`](.gitignore) refuses both).
 - **Nothing shared between users.** Each teammate runs their own OAuth client and authorizes their own accounts.
 - **Treat the config dir as a secret store.** Tokens grant broad access to your mail/calendar/drive/tasks — `~/.config/google-workspace-mcp/` deserves the same care as `~/.ssh/`.
-- An MCP server that can send email and share files deserves review before you enable it — the whole surface is ~1,300 lines of Python in [`src/google_workspace_mcp/`](src/google_workspace_mcp/). See [SECURITY.md](SECURITY.md) to report a vulnerability.
+- An MCP server that can send email and share files deserves review before you enable it — the whole surface is ~1,600 lines of Python in [`src/google_workspace_mcp/`](src/google_workspace_mcp/). See [SECURITY.md](SECURITY.md) to report a vulnerability.
 
 ## Repository layout
 
@@ -267,7 +268,7 @@ google-workspace-mcp/
 ├── commands/
 │   └── google-workspace-setup.md    # /google-workspace-setup — guided setup
 ├── src/google_workspace_mcp/
-│   ├── server.py                    # the MCP server — all 38 tools
+│   ├── server.py                    # the MCP server — all 41 tools
 │   ├── auth.py                      # token load/refresh + Google service builders
 │   ├── accounts.py                  # runtime account registry + GWM_ACCOUNTS scoping
 │   └── authorize.py                 # standalone OAuth consent flow (CLI)
@@ -291,7 +292,9 @@ uv run python -c "from google_workspace_mcp import server"   # import smoke test
 claude plugin validate . --strict         # validate plugin + marketplace manifests
 ```
 
-A user-facing change bumps `version` in [`.claude-plugin/plugin.json`](.claude-plugin/plugin.json), [`pyproject.toml`](pyproject.toml), and `src/google_workspace_mcp/__init__.py`, and adds a [`CHANGELOG.md`](CHANGELOG.md) entry — installed projects pick it up on `/plugin marketplace update`.
+A user-facing change bumps `version` in **five places across four files** — [`.claude-plugin/plugin.json`](.claude-plugin/plugin.json), [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) (**twice**: the top-level `version` *and* `plugins[0].version`), [`pyproject.toml`](pyproject.toml), and `src/google_workspace_mcp/__init__.py` — then runs `uv lock` (which updates a sixth copy inside [`uv.lock`](uv.lock)) and adds a [`CHANGELOG.md`](CHANGELOG.md) entry. Installed projects pick it up on `/plugin marketplace update`.
+
+> Miss `plugins[0].version` and `claude plugin validate . --strict` fails the build: at install time `plugin.json` wins, so a stale entry version is silently ignored and the validator treats that as an error. CI's **Versions agree** step checks every copy up front.
 
 ## Contributing
 

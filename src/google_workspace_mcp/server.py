@@ -20,7 +20,6 @@ from typing import Any, Literal
 
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
-
 from mcp.server.fastmcp import FastMCP
 
 from . import auth

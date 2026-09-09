@@ -10,6 +10,13 @@ only when it is bumped.
 
 ## [Unreleased]
 
+### Changed
+
+- CI: ruff pinned to 0.16.6 (was 0.15.15). ruff 0.16 turns on import sorting
+  (`I001`) by default, so the two import blocks it flagged — `functools`
+  before `pathlib` in `auth.py`, and a stray blank line splitting the
+  third-party block in `server.py` — are sorted. No runtime change.
+
 ## [0.10.0] - 2026-09-08
 
 ### Added

@@ -7,8 +7,8 @@ authorize.py script writes these; the server reads + refreshes them.
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from functools import lru_cache
+from pathlib import Path
 
 from google.auth.exceptions import RefreshError, TransportError
 from google.auth.transport.requests import Request

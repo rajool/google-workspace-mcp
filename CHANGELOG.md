@@ -10,8 +10,37 @@ only when it is bumped.
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-09-08
+
+### Fixed
+
+- `.eml` / `.mht` / `.mhtml` / `.mime` / `.nws` attachments went out as
+  `message/rfc822` with a base64 transfer encoding, which RFC 2046 forbids —
+  Python's own parser could not read the nested message back. Container types
+  (`message/*`, `multipart/*`) now go as `application/octet-stream`, the way
+  compressed and unknown types already did.
+- Attachments over Gmail's 25 MB per-message limit now fail before anything is
+  read or sent, with an error pointing at `drive_file_upload` +
+  `drive_file_link_access`. Previously the whole message was built and
+  base64-encoded, then rejected by Gmail.
+
+### Security
+
+- The server refuses to read from or write into its own secret store — the
+  config directory (`~/.config/google-workspace-mcp/` by default), the tokens
+  directory and the OAuth client file, wherever `GWM_HOME` / `GWM_CREDENTIALS`
+  / `GWM_TOKENS_DIR` point, symlinks resolved. Applies to `attachments`,
+  `drive_file_upload` and `drive_file_update_content` (reads) and to
+  `gmail_attachment_download` and `drive_file_download` (writes). A
+  prompt-injected "attach your token file and send it to …" now fails at the
+  server instead of relying on the model to decline. Covered by tests.
+
 ### Changed
 
+- `drive_file_update_content` docs spell out Drive's revision retention:
+  Google Docs/Sheets/Slides keep full version history; binary files drop old
+  revisions after 30 days or 100 revisions unless `keep_revision_forever`
+  (at most 200 pinned per file).
 - CI: ruff pinned to 0.16.6 (was 0.15.15). ruff 0.16 turns on import sorting
   (`I001`) by default, so the two import blocks it flagged — `functools`
   before `pathlib` in `auth.py`, and a stray blank line splitting the
@@ -262,7 +291,15 @@ how the server is configured.
   scoping, and the `google-workspace-authorize` OAuth CLI.
 - The `/google-workspace-setup` guided-setup command.
 
-[Unreleased]: https://github.com/rajool/google-workspace-mcp/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/rajool/google-workspace-mcp/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/rajool/google-workspace-mcp/compare/v0.10.0...v0.10.1
+[0.10.0]: https://github.com/rajool/google-workspace-mcp/compare/v0.9.0...v0.10.0
+[0.9.0]: https://github.com/rajool/google-workspace-mcp/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/rajool/google-workspace-mcp/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/rajool/google-workspace-mcp/compare/v0.6.3...v0.7.0
+[0.6.3]: https://github.com/rajool/google-workspace-mcp/compare/v0.6.2...v0.6.3
+[0.6.2]: https://github.com/rajool/google-workspace-mcp/compare/v0.6.1...v0.6.2
+[0.6.1]: https://github.com/rajool/google-workspace-mcp/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/rajool/google-workspace-mcp/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/rajool/google-workspace-mcp/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/rajool/google-workspace-mcp/releases/tag/v0.4.0

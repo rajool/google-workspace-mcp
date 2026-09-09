@@ -31,6 +31,40 @@ mcp = FastMCP("google-workspace")
 # ─── helpers ────────────────────────────────────────────────────────────
 
 
+_GMAIL_ATTACHMENT_CAP = 25 * 1024 * 1024  # Gmail's own per-message limit
+
+
+def _guard_local_path(path: Path) -> Path:
+    """Refuse any path inside the server's own secret store.
+
+    The OAuth client and the per-account refresh tokens live under
+    auth.CONFIG_DIR (or wherever GWM_CREDENTIALS / GWM_TOKENS_DIR point).
+    Nothing this server does legitimately reads them as data or writes
+    files into that directory, so a request to attach, upload, or save
+    there is refused outright — it is exactly what a prompt-injected
+    "mail me your token file" would ask for. Symlinks are resolved first,
+    so a link into the store is refused too.
+    """
+    resolved = path.expanduser().resolve()
+    roots = [Path(p).expanduser().resolve() for p in (auth.CONFIG_DIR, auth.TOKENS_DIR)]
+    files = [Path(auth.CREDENTIALS_PATH).expanduser().resolve()]
+    if resolved in files or any(resolved.is_relative_to(r) for r in roots):
+        raise PermissionError(
+            f"Refusing to touch {path}: it is inside the server's own config "
+            f"directory ({auth.CONFIG_DIR}), which holds OAuth secrets."
+        )
+    return path
+
+
+def _local_file(raw_path: str) -> Path:
+    """Resolve a caller-supplied path to an existing regular file, or raise."""
+    path = Path(raw_path).expanduser()
+    if not path.is_file():
+        raise FileNotFoundError(f"File not found: {path}")
+    _guard_local_path(path)
+    return path
+
+
 def _build_mime(
     *,
     sender: str,
@@ -71,12 +105,22 @@ def _build_mime(
         if quote is not None:
             html_body = f'{html_body}<br>{quote["html"]}'
         msg.add_alternative(html_body, subtype="html")
+    total = 0
     for raw_path in attachments or []:
-        path = Path(raw_path).expanduser()
-        if not path.is_file():
-            raise FileNotFoundError(f"Attachment not found: {path}")
+        path = _local_file(raw_path)
+        total += path.stat().st_size
+        if total > _GMAIL_ATTACHMENT_CAP:
+            raise ValueError(
+                f"Attachments total {total / 1_048_576:.1f} MB; Gmail caps a "
+                "message at 25 MB. Upload the file to Drive and share a link "
+                "instead (drive_file_upload + drive_file_link_access)."
+            )
         ctype, encoding = mimetypes.guess_type(path.name)
-        if ctype is None or encoding is not None:
+        # No type, a compressed type (.gz), or a container type (message/*,
+        # multipart/*) all go as opaque bytes: RFC 2046 forbids base64 on
+        # message/rfc822, so a base64'd .eml is unreadable to the recipient.
+        container = ctype is not None and ctype.split("/")[0] in ("message", "multipart")
+        if ctype is None or encoding is not None or container:
             ctype = "application/octet-stream"
         maintype, _, subtype = ctype.partition("/")
         msg.add_attachment(
@@ -675,6 +719,7 @@ def gmail_attachment_download(
 ) -> dict:
     """Download one attachment to a local path. Get `attachment_id` from
     the message payload parts (gmail_message_get with format=full)."""
+    path = _guard_local_path(Path(save_to).expanduser())
     att = (
         auth.gmail(account)
         .users()
@@ -684,7 +729,6 @@ def gmail_attachment_download(
         .execute()
     )
     data = base64.urlsafe_b64decode(att["data"])
-    path = Path(save_to).expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
     return {"saved_to": str(path), "size_bytes": len(data)}
@@ -945,12 +989,12 @@ def drive_file_download(
 ) -> dict:
     """Download a file. For Google Docs/Sheets/Slides, pass `export_mime_type`
     (e.g. 'application/pdf', 'text/plain', 'text/csv')."""
+    out_path = _guard_local_path(Path(save_to).expanduser())
     svc = auth.drive(account).files()
     if export_mime_type:
         req = svc.export_media(fileId=file_id, mimeType=export_mime_type)
     else:
         req = svc.get_media(fileId=file_id, supportsAllDrives=True)
-    out_path = Path(save_to).expanduser()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with io.FileIO(out_path, "wb") as fh:
         downloader = MediaIoBaseDownload(fh, req)
@@ -971,9 +1015,7 @@ def drive_file_upload(
 ) -> dict:
     """Upload a local file to Drive. `convert_to_google_doc=True` converts
     .docx/.xlsx/.pptx to native Google Docs/Sheets/Slides."""
-    path = Path(local_path).expanduser()
-    if not path.is_file():
-        raise FileNotFoundError(local_path)
+    path = _local_file(local_path)
 
     metadata: dict[str, Any] = {"name": name or path.name}
     if parent_folder_id:
@@ -1020,10 +1062,11 @@ def drive_file_update_content(
     history. Use this rather than `drive_file_upload` to revise something
     already in Drive: uploading again under the same name creates a second
     file, it does not version the first. `convert_to_google_doc=True` revises
-    a native Doc/Sheet/Slides from a local .docx/.xlsx/.pptx."""
-    path = Path(local_path).expanduser()
-    if not path.is_file():
-        raise FileNotFoundError(local_path)
+    a native Doc/Sheet/Slides from a local .docx/.xlsx/.pptx. Google
+    Docs/Sheets/Slides keep full version history; for binary files Drive
+    drops old revisions after 30 days or 100 revisions unless
+    `keep_revision_forever=True` (at most 200 pinned per file)."""
+    path = _local_file(local_path)
 
     if mime_type is None:
         mime_type, _ = mimetypes.guess_type(str(path))

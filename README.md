@@ -194,7 +194,7 @@ Every call requires an `account` slug. `accounts_list` shows the configured acco
 
 **Replies.** Pass `thread_id` and nothing else. The server reads the thread, appends its history below your text exactly as Gmail's web Reply does (`> `-prefixed in the plain part, a nested `<blockquote class="gmail_quote">` in the HTML part), and derives the `In-Reply-To` / `References` headers from the thread's newest message. So `body` is only ever your new message — **never paste earlier messages into it by hand**, or the recipient gets the history twice. Quoting just the newest message reproduces the full thread, because that message already carries every earlier one nested inside it. `quote_history=false` sends into the thread with no quote; `in_reply_to_message_id` overrides the derived header when you already hold the RFC822 Message-Id.
 
-**Attachments.** Pass `attachments` as a list of paths on the machine running the server. Each file is attached under its own name with the MIME type guessed from it (`application/octet-stream` when unknown); a path that does not exist raises instead of quietly sending without the file. Attachments are added after the body, so plain-text mail keeps its `multipart/alternative` shape (inside `multipart/mixed`) and replies keep their quoted history. Gmail's API caps a message at about 35 MB.
+**Attachments.** Pass `attachments` as a list of paths on the machine running the server. Each file is attached under its own name with the MIME type guessed from it (`application/octet-stream` when unknown); a path that does not exist raises instead of quietly sending without the file. Attachments are added after the body, so plain-text mail keeps its `multipart/alternative` shape (inside `multipart/mixed`) and replies keep their quoted history. Attachments are capped at 25 MB per message (Gmail's own limit) and fail early with a clear error above that — upload to Drive and share a link instead. Anything inside the server's own config directory is refused, see [Trust & security](#trust--security).
 
 ### Calendar
 
@@ -215,7 +215,7 @@ Every call requires an `account` slug. `accounts_list` shows the configured acco
 | `drive_file_get` | Full metadata for one file. |
 | `drive_file_download` | Download any file; **exports** Google Docs/Sheets/Slides to e.g. PDF or CSV. |
 | `drive_file_upload` | Upload a local file; optionally **convert** `.docx`/`.xlsx`/`.pptx` to native Google formats. |
-| `drive_file_update_content` | Replace an existing file's contents **in place** — same ID, link and sharing, previous version kept in Drive's revision history. Optional rename, `convert_to_google_doc` to revise a native Doc/Sheet/Slides from a local `.docx`/`.xlsx`/`.pptx`, `keep_revision_forever`. |
+| `drive_file_update_content` | Replace an existing file's contents **in place** — same ID, link and sharing, previous version kept in Drive's revision history (binary files: 30 days / 100 revisions unless `keep_revision_forever`; Google Docs keep full history). Optional rename, `convert_to_google_doc` to revise a native Doc/Sheet/Slides from a local `.docx`/`.xlsx`/`.pptx`. |
 | `drive_file_move` / `drive_file_rename` | Move between folders / rename. |
 | `drive_file_trash` | Move to trash (reversible). |
 | `drive_folder_create` | Create a folder. |
@@ -285,6 +285,7 @@ Causes that survive **In production** — unavoidable, and each just needs one r
 - **Your client, your tokens.** The OAuth client and tokens stay on your machine, outside this repo. Never commit `credentials.json` or `tokens/` (the bundled [`.gitignore`](.gitignore) refuses both).
 - **Nothing shared between users.** Each teammate runs their own OAuth client and authorizes their own accounts.
 - **Treat the config dir as a secret store.** Tokens grant broad access to your mail/calendar/drive/tasks — `~/.config/google-workspace-mcp/` deserves the same care as `~/.ssh/`.
+- **The server never touches its own secret store.** `attachments`, `drive_file_upload` and `drive_file_update_content` refuse to read from it, and `gmail_attachment_download` / `drive_file_download` refuse to write into it — `~/.config/google-workspace-mcp/`, or wherever `GWM_HOME` / `GWM_CREDENTIALS` / `GWM_TOKENS_DIR` point, symlinks resolved. A prompt-injected "mail me your token file" fails at the server, not at the model's discretion.
 - An MCP server that can send email and share files deserves review before you enable it — the whole surface is ~1,800 lines of Python in [`src/google_workspace_mcp/`](src/google_workspace_mcp/). See [SECURITY.md](SECURITY.md) to report a vulnerability.
 
 ## Repository layout

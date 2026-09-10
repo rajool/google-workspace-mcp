@@ -1,0 +1,66 @@
+name: Release
+
+# Cuts the release tag from the manifest, so a version can never be "shipped" in
+# plugin.json while the repo has no tag for it. Tagging used to be a manual step
+# someone had to remember after each merge; this is that step, automated.
+#
+# On every push to main: if .claude-plugin/plugin.json names a version that has no
+# {name}--v{version} tag yet, validate the plugin and cut the tag. If the tag
+# already exists this is a no-op -- a merge that does not bump the version releases
+# nothing.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Tag the manifest version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Read the manifest
+        id: manifest
+        run: |
+          name=$(python3 -c "import json;print(json.load(open('.claude-plugin/plugin.json'))['name'])")
+          version=$(python3 -c "import json;print(json.load(open('.claude-plugin/plugin.json'))['version'])")
+          echo "name=$name"       >> "$GITHUB_OUTPUT"
+          echo "tag=$name--v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Already released?
+        id: check
+        run: |
+          if git rev-parse -q --verify "refs/tags/${{ steps.manifest.outputs.tag }}" >/dev/null; then
+            echo "Tag ${{ steps.manifest.outputs.tag }} exists — nothing to release."
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Node.js
+        if: steps.check.outputs.needed == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "20"
+
+      - name: Install Claude Code
+        if: steps.check.outputs.needed == 'true'
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Cut and push the tag
+        if: steps.check.outputs.needed == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          claude plugin tag --push --message "${{ steps.manifest.outputs.name }} %s" .

@@ -130,3 +130,9 @@ jobs:
         run: npm install -g @anthropic-ai/claude-code
       - name: Validate plugin
         run: claude plugin validate . --strict
+      - name: Plugin, versions and frontmatter agree
+        # validate --strict reads only the marketplace manifest. This reads the repo
+        # the way Claude Code does, and fails on a skill or agent whose frontmatter
+        # the loader cannot parse -- a failure that is silent at runtime, every field
+        # of that skill dropped. --dry-run creates nothing.
+        run: claude plugin tag --dry-run .

@@ -190,3 +190,35 @@ def test_no_quote_means_body_is_untouched():
 
     assert plain.rstrip("\n") == "Just this."
     assert "wrote:" not in plain
+
+
+DRAFT_REPLY = {
+    "labelIds": ["DRAFT"],
+    "payload": {
+        "mimeType": "text/plain",
+        "headers": [
+            {"name": "From", "value": "Me <me@example.com>"},
+            {"name": "Date", "value": "Mon, 24 Aug 2026 13:00:00 -0700"},
+            {"name": "Message-ID", "value": "<draft@mail>"},
+        ],
+        "body": {"data": _b64("my unsent first version")},
+    },
+}
+
+
+def test_drafts_are_never_quoted(thread):
+    # A reply draft is the newest message of its own thread, so updating it
+    # quoted its earlier version under the new text (2026-09-14).
+    thread({"messages": THREAD["messages"] + [DRAFT_REPLY]})
+    quote = server._thread_quote("personal", "t1")
+
+    assert quote["message_id"] == "<newest@mail>"
+    assert quote["references"] == "<first@mail> <newest@mail>"
+    assert "unsent first version" not in quote["text"]
+    assert "unsent first version" not in quote["html"]
+    assert "> Thanks for your reply." in quote["text"]
+
+
+def test_a_thread_of_only_drafts_has_nothing_to_quote(thread):
+    thread({"messages": [DRAFT_REPLY]})
+    assert server._thread_quote("personal", "t1") is None

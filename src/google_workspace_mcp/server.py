@@ -227,7 +227,7 @@ def _quote_prefix(text: str) -> str:
 
 
 def _thread_quote(account: str, thread_id: str) -> dict[str, Any] | None:
-    """Build reply material from the newest message of a thread.
+    """Build reply material from the newest sent or received message of a thread.
 
     Returns the RFC822 Message-Id and References chain needed for correct
     threading, plus that message quoted in both flavours: "> "-prefixed text
@@ -235,8 +235,10 @@ def _thread_quote(account: str, thread_id: str) -> dict[str, Any] | None:
 
     Quoting only the newest message is enough to reproduce the whole thread:
     it already carries every earlier message nested inside it, exactly as
-    Gmail's web Reply builds it. Returns None when the thread cannot be read
-    (bad id, deleted, missing scope) so a send degrades to an unquoted reply
+    Gmail's web Reply builds it. Drafts are skipped: they are not part of the
+    conversation, and a reply draft is itself the newest message of its thread.
+    Returns None when the thread cannot be read (bad id, deleted, missing
+    scope) or holds nothing but drafts, so a send degrades to an unquoted reply
     instead of failing outright.
     """
     try:
@@ -249,7 +251,14 @@ def _thread_quote(account: str, thread_id: str) -> dict[str, Any] | None:
         )
     except HttpError:
         return None
-    messages = thread.get("messages") or []
+    # Quoting a draft sent the recipient an unsent text and pointed In-Reply-To
+    # at a message they never received: gmail_draft_update with thread_id
+    # re-quoted the draft's own earlier version under the new body.
+    messages = [
+        m
+        for m in thread.get("messages") or []
+        if "DRAFT" not in (m.get("labelIds") or [])
+    ]
     if not messages:
         return None
     payload = messages[-1].get("payload") or {}

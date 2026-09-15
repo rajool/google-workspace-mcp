@@ -10,6 +10,17 @@ only when it is bumped.
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-09-14
+
+### Fixed
+
+- Replies no longer quote an unsent draft. `_thread_quote` took the thread's
+  newest message with drafts included, and a reply draft is itself the newest
+  message of its thread: `gmail_draft_update` with `thread_id` quoted the
+  draft's own earlier version under the new text and pointed `In-Reply-To` at
+  it, and a reply into a thread holding a pending draft quoted that draft.
+  Drafts are now skipped; the newest sent or received message is quoted.
+
 ## [0.10.1] - 2026-09-08
 
 ### Fixed
@@ -291,7 +302,8 @@ how the server is configured.
   scoping, and the `google-workspace-authorize` OAuth CLI.
 - The `/google-workspace-setup` guided-setup command.
 
-[Unreleased]: https://github.com/rajool/google-workspace-mcp/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/rajool/google-workspace-mcp/compare/google-workspace-mcp--v0.10.2...HEAD
+[0.10.2]: https://github.com/rajool/google-workspace-mcp/compare/v0.10.1...google-workspace-mcp--v0.10.2
 [0.10.1]: https://github.com/rajool/google-workspace-mcp/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/rajool/google-workspace-mcp/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/rajool/google-workspace-mcp/compare/v0.8.0...v0.9.0

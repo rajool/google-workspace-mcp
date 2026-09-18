@@ -10,6 +10,16 @@ only when it is bumped.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-18
+
+### Added
+
+- Calendar management, not just events: `calendar_create` makes a secondary
+  calendar; `calendar_share` / `calendar_unshare` grant and revoke one
+  person's access (`freeBusyReader`, `reader`, `writer` — never `owner`), and
+  `calendar_acl_list` shows who can see a calendar. Until now a shared school
+  or project calendar had to be created and shared in the Calendar UI.
+
 ## [0.10.2] - 2026-09-14
 
 ### Fixed

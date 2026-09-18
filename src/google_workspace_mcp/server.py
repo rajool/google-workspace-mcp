@@ -926,6 +926,114 @@ def calendar_event_delete(
     return {"deleted": event_id}
 
 
+@mcp.tool()
+def calendar_create(
+    account: AccountSlug,
+    summary: str,
+    description: str | None = None,
+    timezone: str | None = None,
+) -> dict:
+    """Create a new secondary calendar owned by the account (a school, project, or family calendar).
+
+    Returns the new calendar's id — pass it as `calendar_id` to the event tools and to `calendar_share`.
+    """
+    body: dict[str, Any] = {"summary": summary}
+    if description:
+        body["description"] = description
+    if timezone:
+        body["timeZone"] = timezone
+    cal = auth.calendar(account).calendars().insert(body=body).execute()
+    return {
+        "id": cal.get("id"),
+        "summary": cal.get("summary"),
+        "description": cal.get("description"),
+        "timeZone": cal.get("timeZone"),
+    }
+
+
+_SHARE_ROLES = ("freeBusyReader", "reader", "writer")
+
+
+def _acl_rule_id(email: str) -> str:
+    """Google names a per-user sharing rule `user:<email>`."""
+    return f"user:{email.strip().lower()}"
+
+
+@mcp.tool()
+def calendar_acl_list(account: AccountSlug, calendar_id: str) -> dict:
+    """Who can see a calendar — one row per sharing rule (a user, a group, a domain, or the public)."""
+    resp = auth.calendar(account).acl().list(calendarId=calendar_id).execute()
+    rules = [
+        {
+            "id": r.get("id"),
+            "role": r.get("role"),
+            "scope_type": r.get("scope", {}).get("type"),
+            "scope_value": r.get("scope", {}).get("value"),
+        }
+        for r in resp.get("items", [])
+    ]
+    return {"calendar_id": calendar_id, "rules": rules}
+
+
+@mcp.tool()
+def calendar_share(
+    account: AccountSlug,
+    calendar_id: str,
+    email: str,
+    role: Literal["freeBusyReader", "reader", "writer"] = "reader",
+    send_notifications: bool = True,
+) -> dict:
+    """Share a calendar with one person (or Google group) by email.
+
+    Roles: `freeBusyReader` (busy/free only), `reader` (see all event details),
+    `writer` (also add and edit events). `owner` is deliberately not offered —
+    hand ownership over in the Calendar UI. Sharing an address that already has
+    access updates its role. By default Google emails the person an invitation.
+    """
+    if role not in _SHARE_ROLES:
+        raise ValueError(f"role must be one of {_SHARE_ROLES}, got {role!r}")
+    rule = (
+        auth.calendar(account)
+        .acl()
+        .insert(
+            calendarId=calendar_id,
+            body={"role": role, "scope": {"type": "user", "value": email.strip()}},
+            sendNotifications=send_notifications,
+        )
+        .execute()
+    )
+    return {
+        "calendar_id": calendar_id,
+        "rule_id": rule.get("id"),
+        "email": rule.get("scope", {}).get("value", email.strip()),
+        "role": rule.get("role", role),
+    }
+
+
+@mcp.tool()
+def calendar_unshare(account: AccountSlug, calendar_id: str, email: str) -> dict:
+    """Remove one person's access to a calendar.
+
+    Looks the address up in the calendar's sharing rules (case-insensitively) and
+    deletes that rule; falls back to the conventional `user:<email>` rule id.
+    """
+    svc = auth.calendar(account)
+    want = email.strip().lower()
+    rules = svc.acl().list(calendarId=calendar_id).execute().get("items", [])
+    match = next(
+        (
+            r
+            for r in rules
+            if r.get("scope", {}).get("type") == "user"
+            and (r.get("scope", {}).get("value") or "").lower() == want
+        ),
+        None,
+    )
+    rule_id = match["id"] if match else _acl_rule_id(email)
+    svc.acl().delete(calendarId=calendar_id, ruleId=rule_id).execute()
+    return {"calendar_id": calendar_id, "removed": rule_id, "found": match is not None}
+
+
 # ─── Drive ──────────────────────────────────────────────────────────────
 
 

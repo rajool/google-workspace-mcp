@@ -206,6 +206,10 @@ Every call requires an `account` slug. `accounts_list` shows the configured acco
 | `calendar_event_create` | Timed or all-day events — attendees, location, timezone, invitation emails (`send_updates`), optional **Google Meet** link. |
 | `calendar_event_update` | Patch only the fields you pass. |
 | `calendar_event_delete` | Delete an event. |
+| `calendar_create` | A new secondary calendar (a school, project, or family calendar) — returns its id for the event tools and `calendar_share`. |
+| `calendar_acl_list` | Who can see a calendar — one row per sharing rule. |
+| `calendar_share` | Share a calendar with one email as `freeBusyReader`, `reader`, or `writer` (`owner` is deliberately not offered); Google emails an invitation unless `send_notifications=False`. |
+| `calendar_unshare` | Remove one person's access. |
 
 ### Drive
 

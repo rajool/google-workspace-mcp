@@ -10,6 +10,44 @@ only when it is bumped.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-09-20
+
+### Added
+
+- Contacts, read-only: `contacts_lookup` resolves ONE address to the name to
+  address that person by, and `contacts_search` finds people by name, address
+  or company. Both cover saved contacts **and** "other contacts" — the people
+  Gmail records from correspondence but the user never saved, which is where
+  most names actually are.
+- `contacts_lookup` falls back to the display name on real mail from that
+  address when the People API has nothing, so it still answers for someone who
+  was never a contact at all. It returns `name: null` when genuinely nobody
+  knows the address — the signal that a bare address is the correct form, as
+  for a role mailbox like `info@`.
+
+### Why
+
+Gmail shows the display name the *sender* supplies. A recipient written as a
+bare address therefore arrives as a raw address, while every message a human
+sends carries a name — so mail from this server read as machine-written
+(reported 2026-09-19). Nothing here could look a name up; now it can.
+
+### Changed
+
+- Two new scopes, both read-only: `contacts.readonly` and
+  `contacts.other.readonly`. This server never writes a contact.
+
+### Upgrading
+
+Two manual steps, both one-off:
+
+1. **Enable the People API** in the Google Cloud project behind your OAuth
+   client. Without it every contacts call fails with `SERVICE_DISABLED`.
+2. **Re-authorize each account** — `google-workspace-authorize <slug>` — so the
+   token carries the new scopes. Existing tokens keep working for Gmail,
+   Calendar, Drive and Tasks until you do.
+
+
 ## [0.11.0] - 2026-09-18
 
 ### Added

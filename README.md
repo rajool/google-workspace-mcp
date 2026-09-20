@@ -22,7 +22,7 @@ A **multi-account** Google Workspace MCP server for [Claude Code](https://code.c
 - **Per-project access control.** Accounts are configured at *runtime*, never baked into code. Each project's `.mcp.json` scopes it to a subset, so a personal project never even sees your work account.
 - **Your own OAuth client.** You bring a (free) Google Cloud OAuth client, so you own the access and get the full tool surface — including things the default `claude.ai` connector can't do, like deleting a draft. Nothing is routed through anyone else's infrastructure.
 - **Secrets stay out of the tree.** The OAuth client and per-account refresh tokens live under `~/.config/google-workspace-mcp/` (written `0600`), never next to code.
-- **42 tools across four services** — see the [catalog](#tools) below.
+- **48 tools across five services** — see the [catalog](#tools) below.
 
 ## Table of contents
 
@@ -237,6 +237,21 @@ Every call requires an `account` slug. `accounts_list` shows the configured acco
 | `task_move` | Reposition: under a parent and/or after a sibling. |
 | `task_delete` | Delete a task. |
 
+### Contacts
+
+| Tool | What it does |
+|---|---|
+| `contacts_lookup` | Resolve ONE address to the name to address that person by. Tries saved contacts, then "other contacts", then the display name on real mail from that address. Returns `name: null` when nothing knows it — which is the signal that a bare address is correct. |
+| `contacts_search` | Search contacts by name, address or company. Covers saved **and** "other" contacts, so someone who has only ever been emailed is still found. |
+
+Read-only, and there for one job: Gmail shows the display name the *sender*
+supplies, so a recipient written as a bare address arrives as a raw address
+while everything a human sends carries a name. Look the address up, then send
+to `"Firstname Lastname <addr@host>"`.
+
+> Most names live in **other contacts** — the people Gmail recorded from
+> correspondence but the user never saved — which is why both books are searched.
+
 ## Configuration & storage
 
 Everything lives under the config home — `$GWM_HOME`, else `$XDG_CONFIG_HOME/google-workspace-mcp`, else `~/.config/google-workspace-mcp/`:
@@ -258,8 +273,12 @@ Broad on purpose — these are your own accounts; narrower scopes would force a 
 - `https://www.googleapis.com/auth/calendar`
 - `https://www.googleapis.com/auth/drive`
 - `https://www.googleapis.com/auth/tasks`
+- `https://www.googleapis.com/auth/contacts.readonly` *(read-only)*
+- `https://www.googleapis.com/auth/contacts.other.readonly` *(read-only)*
 
-> Adding a scope (as v0.3.0 did for Tasks) requires re-running `google-workspace-authorize <slug>` for each account.
+> Adding a scope (as v0.3.0 did for Tasks, and v0.12.0 for Contacts) requires re-running `google-workspace-authorize <slug>` for each account. **v0.12.0 also needs the People API enabled** in the Google Cloud project behind your OAuth client — without it every contacts call returns `SERVICE_DISABLED`.
+
+> The two contact scopes are deliberately the read-only pair: this server never writes a contact.
 
 > Being this far past Google's name/email/profile exemption is also why the OAuth app **must be published** rather than left in *Testing* — see [setup step 4](#1-create-your-own-google-cloud-oauth-client).
 
@@ -302,7 +321,7 @@ google-workspace-mcp/
 ├── commands/
 │   └── google-workspace-setup.md    # /google-workspace-setup — guided setup
 ├── src/google_workspace_mcp/
-│   ├── server.py                    # the MCP server — all 42 tools
+│   ├── server.py                    # the MCP server — all 48 tools
 │   ├── auth.py                      # token load/refresh + Google service builders
 │   ├── accounts.py                  # runtime account registry + GWM_ACCOUNTS scoping
 │   └── authorize.py                 # standalone OAuth consent flow (CLI)

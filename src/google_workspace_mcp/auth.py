@@ -36,6 +36,11 @@ SCOPES = [
     "https://www.googleapis.com/auth/calendar",
     "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/tasks",
+    # Read-only: a recipient is addressed by name, never as a bare address.
+    # "other" contacts are the ones Gmail records from correspondence but the
+    # user never saved — usually where a name actually lives.
+    "https://www.googleapis.com/auth/contacts.readonly",
+    "https://www.googleapis.com/auth/contacts.other.readonly",
 ]
 
 
@@ -151,3 +156,7 @@ def drive(slug: str):
 
 def tasks(slug: str):
     return _service(slug, "tasks", "v1")
+
+
+def people(slug: str):
+    return _service(slug, "people", "v1")

@@ -1364,6 +1364,119 @@ def _task_summary(t: dict) -> dict:
     return {k: t[k] for k in keys if k in t}
 
 
+# ─── contacts ───────────────────────────────────────────────────────────
+#
+# Why this exists: Gmail shows the display name the SENDER supplies, so a
+# recipient written as a bare address arrives as a raw address. The name for
+# someone the user has only corresponded with lives in "other contacts", not
+# in saved contacts, so both are searched. Read-only by scope.
+
+
+_CONTACT_READ_MASK = "names,emailAddresses,organizations"
+_OTHER_READ_MASK = "names,emailAddresses"
+
+
+def _contact_rows(res: dict) -> list[dict]:
+    """Flatten a People search response to {name, emails, organization}."""
+    rows = []
+    for hit in res.get("results") or []:
+        person = hit.get("person") or {}
+        names = person.get("names") or []
+        emails = person.get("emailAddresses") or []
+        orgs = person.get("organizations") or []
+        rows.append({
+            "name": names[0].get("displayName") if names else None,
+            "emails": [e["value"] for e in emails if e.get("value")],
+            "organization": orgs[0].get("name") if orgs else None,
+        })
+    return rows
+
+
+def _people_search(account: str, query: str, page_size: int) -> list[dict]:
+    """Search saved contacts, then other contacts. Warms the server-side cache.
+
+    People search runs off a cache Google builds per session; the documented
+    way to prime it is a request with an empty query. Rather than pay for that
+    on every call, only warm up and retry when a search comes back empty.
+    """
+    svc = auth.people(account)
+
+    def saved(q):
+        return svc.people().searchContacts(
+            query=q, pageSize=page_size, readMask=_CONTACT_READ_MASK).execute()
+
+    def other(q):
+        return svc.otherContacts().search(
+            query=q, pageSize=page_size, readMask=_OTHER_READ_MASK).execute()
+
+    rows = _contact_rows(saved(query)) + _contact_rows(other(query))
+    if not rows:
+        saved("")
+        other("")
+        rows = _contact_rows(saved(query)) + _contact_rows(other(query))
+
+    seen, merged = set(), []
+    for row in rows:
+        key = (row["name"], tuple(row["emails"]))
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(row)
+    return merged[:page_size]
+
+
+@mcp.tool()
+def contacts_search(
+    account: AccountSlug,
+    query: str,
+    max_results: int = 10,
+) -> dict:
+    """Search the account's contacts by name, email address or company.
+
+    Covers BOTH saved contacts and "other contacts" — the people Gmail
+    recorded from correspondence but the user never saved — so someone who
+    has only ever been emailed is still found.
+    """
+    page_size = max(1, min(int(max_results), 30))
+    return {"contacts": _people_search(account, query, page_size)}
+
+
+@mcp.tool()
+def contacts_lookup(account: AccountSlug, email: str) -> dict:
+    """Resolve ONE email address to the name to address that person by.
+
+    Returns {"email", "name", "source"}. `source` is "contacts" (saved or
+    other contacts) or "sent_mail" — the display name on a real message from
+    that address, which is what Google itself shows — or null when nothing
+    here knows the address, in which case the bare address is the correct
+    form (a role mailbox like info@ usually lands here).
+
+    Use it before writing a recipient: an address the account can name is
+    addressed as "Firstname Lastname <addr@host>", never bare.
+    """
+    target = email.strip().lower()
+
+    for row in _people_search(account, target, 30):
+        if row["name"] and any(e.lower() == target for e in row["emails"]):
+            return {"email": email, "name": row["name"], "source": "contacts"}
+
+    # Fall back to what the address itself has signed mail as.
+    res = auth.gmail(account).users().messages().list(
+        userId="me", q=f"from:{target}", maxResults=1).execute()
+    for ref in res.get("messages") or []:
+        msg = auth.gmail(account).users().messages().get(
+            userId="me", id=ref["id"], format="metadata",
+            metadataHeaders=["From"]).execute()
+        for h in msg.get("payload", {}).get("headers", []):
+            if h.get("name", "").lower() != "from":
+                continue
+            name, addr = parseaddr(h.get("value", ""))
+            if name and addr.lower() == target:
+                return {"email": email, "name": name, "source": "sent_mail"}
+
+    return {"email": email, "name": None, "source": None}
+
+
 @mcp.tool()
 def tasklist_list(account: AccountSlug) -> dict:
     """List the account's task lists (each has an id + title)."""

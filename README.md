@@ -237,6 +237,21 @@ Every call requires an `account` slug. `accounts_list` shows the configured acco
 | `task_move` | Reposition: under a parent and/or after a sibling. |
 | `task_delete` | Delete a task. |
 
+### Contacts
+
+| Tool | What it does |
+|---|---|
+| `contacts_lookup` | Resolve ONE address to the name to address that person by. Tries saved contacts, then "other contacts", then the display name on real mail from that address. Returns `name: null` when nothing knows it — which is the signal that a bare address is correct. |
+| `contacts_search` | Search contacts by name, address or company. Covers saved **and** "other" contacts, so someone who has only ever been emailed is still found. |
+
+Read-only, and there for one job: Gmail shows the display name the *sender*
+supplies, so a recipient written as a bare address arrives as a raw address
+while everything a human sends carries a name. Look the address up, then send
+to `"Firstname Lastname <addr@host>"`.
+
+> Most names live in **other contacts** — the people Gmail recorded from
+> correspondence but the user never saved — which is why both books are searched.
+
 ## Configuration & storage
 
 Everything lives under the config home — `$GWM_HOME`, else `$XDG_CONFIG_HOME/google-workspace-mcp`, else `~/.config/google-workspace-mcp/`:
@@ -258,8 +273,12 @@ Broad on purpose — these are your own accounts; narrower scopes would force a 
 - `https://www.googleapis.com/auth/calendar`
 - `https://www.googleapis.com/auth/drive`
 - `https://www.googleapis.com/auth/tasks`
+- `https://www.googleapis.com/auth/contacts.readonly` *(read-only)*
+- `https://www.googleapis.com/auth/contacts.other.readonly` *(read-only)*
 
-> Adding a scope (as v0.3.0 did for Tasks) requires re-running `google-workspace-authorize <slug>` for each account.
+> Adding a scope (as v0.3.0 did for Tasks, and v0.12.0 for Contacts) requires re-running `google-workspace-authorize <slug>` for each account. **v0.12.0 also needs the People API enabled** in the Google Cloud project behind your OAuth client — without it every contacts call returns `SERVICE_DISABLED`.
+
+> The two contact scopes are deliberately the read-only pair: this server never writes a contact.
 
 > Being this far past Google's name/email/profile exemption is also why the OAuth app **must be published** rather than left in *Testing* — see [setup step 4](#1-create-your-own-google-cloud-oauth-client).
 

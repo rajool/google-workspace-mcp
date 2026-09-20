@@ -22,7 +22,7 @@ A **multi-account** Google Workspace MCP server for [Claude Code](https://code.c
 - **Per-project access control.** Accounts are configured at *runtime*, never baked into code. Each project's `.mcp.json` scopes it to a subset, so a personal project never even sees your work account.
 - **Your own OAuth client.** You bring a (free) Google Cloud OAuth client, so you own the access and get the full tool surface — including things the default `claude.ai` connector can't do, like deleting a draft. Nothing is routed through anyone else's infrastructure.
 - **Secrets stay out of the tree.** The OAuth client and per-account refresh tokens live under `~/.config/google-workspace-mcp/` (written `0600`), never next to code.
-- **42 tools across four services** — see the [catalog](#tools) below.
+- **48 tools across five services** — see the [catalog](#tools) below.
 
 ## Table of contents
 
@@ -321,7 +321,7 @@ google-workspace-mcp/
 ├── commands/
 │   └── google-workspace-setup.md    # /google-workspace-setup — guided setup
 ├── src/google_workspace_mcp/
-│   ├── server.py                    # the MCP server — all 42 tools
+│   ├── server.py                    # the MCP server — all 48 tools
 │   ├── auth.py                      # token load/refresh + Google service builders
 │   ├── accounts.py                  # runtime account registry + GWM_ACCOUNTS scoping
 │   └── authorize.py                 # standalone OAuth consent flow (CLI)
